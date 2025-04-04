@@ -1,9 +1,5 @@
-Aquí tienes el **README.md** en un solo bloque para que puedas copiar y pegar fácilmente:  
-
+Buu👻 Hola Esto es un Trabajo que tardó varios años es ser posible y no por que el script sea la gran cosa sino por el enfoque especifico para Diseñadores, basado en mi experiencia propia en un uso dìario de trabajo, ahora lo comprato con ustedes para que puedan mejorar su flujo de trabajo.
 ---
-
-# **COPIA Y PEGA TODO ESTE TEXTO EN TU `README.md`**  
-
 # Scripts de Optimización para Windows (Enfoque en Diseñadores)
 
 Este repositorio contiene dos scripts diseñados para mejorar el rendimiento de Windows sin afectar **impresoras, plotters, programas de diseño como Adobe Photoshop e Illustrator, asistencia remota (AnyDesk) y sistemas de transferencia de archivos (Resilio Sync)**.  
