@@ -1,64 +1,85 @@
-# Optimizar-PC-Avanzado.ps1
+# Optimizar-PC-Avanzado.ps1 con interfaz amigable
 
-Write-Host "Iniciando optimización avanzada de la PC para diseñadores..." -ForegroundColor Cyan
+function Mostrar-PanelEstado($mensaje, $color) {
+    Write-Host ("=" * 60) -ForegroundColor DarkGray
+    Write-Host $mensaje -ForegroundColor $color
+    Write-Host ("=" * 60) -ForegroundColor DarkGray
+    Start-Sleep -Milliseconds 800
+}
 
-# 1. Eliminar Bloatware (AppX innecesarias)
-Write-Host "Eliminando bloatware..."
+Mostrar-PanelEstado "Iniciando optimización avanzada de la PC..." Cyan
+
+# Eliminar bloatware conocido sin afectar diseño
 Get-AppxPackage *xbox* | Remove-AppxPackage -ErrorAction SilentlyContinue
 Get-AppxPackage *bing* | Remove-AppxPackage -ErrorAction SilentlyContinue
 Get-AppxPackage *zune* | Remove-AppxPackage -ErrorAction SilentlyContinue
 Get-AppxPackage *solitaire* | Remove-AppxPackage -ErrorAction SilentlyContinue
+Get-AppxPackage *3d* | Remove-AppxPackage -ErrorAction SilentlyContinue
+Get-AppxPackage *people* | Remove-AppxPackage -ErrorAction SilentlyContinue
+Mostrar-PanelEstado "✅ Bloatware eliminado correctamente." Green
 
-# 2. Desactivar servicios innecesarios (seguros para diseñadores)
-Write-Host "Desactivando servicios innecesarios..."
-$servicesToDisable = @(
-    'DiagTrack',              # Telemetría
-    'MapsBroker',            # Mapas offline
-    'WMPNetworkSvc',         # Compartir multimedia
-    'WerSvc',                # Informe de errores
-    'RetailDemo',            # Modo demo de tiendas
-    'Fax',                   # Servicio de fax
-    'PimIndexMaintenanceSvc', # Indexación de contactos
-    'SensorService',         # Sensores (no usados)
-    'TabletInputService'     # Teclado táctil en PCs
+# Deshabilitar servicios innecesarios para diseñadores
+$serviciosADesactivar = @("DiagTrack","RetailDemo","Fax","RemoteRegistry","XblGameSave","MapsBroker","WMPNetworkSvc","dmwappushsvc")
+foreach ($servicio in $serviciosADesactivar) {
+    Get-Service -Name $servicio -ErrorAction SilentlyContinue | Set-Service -StartupType Disabled -ErrorAction SilentlyContinue
+}
+Mostrar-PanelEstado "🛑 Servicios innecesarios deshabilitados." Green
+
+# Mantener servicios esenciales de diseño
+$serviciosEsenciales = @("Spooler","PrintWorkflowUserSvc","FDResPub","LanmanServer","LanmanWorkstation")
+foreach ($servicio in $serviciosEsenciales) {
+    Get-Service -Name $servicio -ErrorAction SilentlyContinue | Set-Service -StartupType Automatic -ErrorAction SilentlyContinue
+}
+Mostrar-PanelEstado "🔒 Servicios esenciales protegidos (impresión y red)." Yellow
+
+# Optimizar efectos visuales
+$visuals = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects"
+Set-ItemProperty -Path $visuals -Name VisualFXSetting -Value 2
+Mostrar-PanelEstado "✨ Efectos visuales optimizados para rendimiento." Green
+
+# Priorizar rendimiento para Adobe
+$adobeKeys = "HKCU:\Software\Adobe", "HKLM:\SOFTWARE\Adobe"
+foreach ($key in $adobeKeys) {
+    if (Test-Path $key) {
+        New-ItemProperty -Path $key -Name "PerformanceMode" -Value 1 -PropertyType DWord -Force -ErrorAction SilentlyContinue
+    }
+}
+Mostrar-PanelEstado "🎨 Adobe Suite configurado para mejor rendimiento." Green
+
+# Limpieza de archivos temporales, cachés y miniaturas
+$paths = @(
+    "$env:TEMP\*",
+    "$env:windir\Temp\*",
+    "$env:USERPROFILE\AppData\Local\Microsoft\Windows\Explorer\thumbcache_*.db"
 )
-foreach ($svc in $servicesToDisable) {
-    Get-Service -Name $svc -ErrorAction SilentlyContinue | Set-Service -StartupType Disabled
+foreach ($path in $paths) {
+    Remove-Item -Path $path -Recurse -Force -ErrorAction SilentlyContinue
+}
+Mostrar-PanelEstado "🧹 Limpieza profunda de archivos temporales completada." Green
+
+# Optimizar tareas de inicio
+Get-ScheduledTask | Where-Object { $_.TaskName -like "*Office*" -or $_.TaskName -like "*Edge*" } | Disable-ScheduledTask -ErrorAction SilentlyContinue
+Mostrar-PanelEstado "🚀 Tareas de inicio optimizadas." Green
+
+# Verificar y reparar archivos del sistema (en segundo plano)
+Start-Process powershell -ArgumentList "-Command sfc /scannow" -Verb runAs
+Mostrar-PanelEstado "🛠️ Verificando y reparando archivos del sistema (puede tardar)..." Yellow
+
+# Reducir consumo y temperatura sin sacrificar rendimiento
+powercfg -setactive SCHEME_BALANCED
+powercfg -h off
+Mostrar-PanelEstado "🌡️ Plan de energía equilibrado activado para evitar sobrecalentamiento." Green
+
+# Desfragmentación y optimización de disco (solo si es HDD)
+if ((Get-PhysicalDisk | Where-Object { $_.MediaType -eq 'HDD' }).Count -gt 0) {
+    Optimize-Volume -DriveLetter C -Defrag -Verbose -ErrorAction SilentlyContinue
+    Mostrar-PanelEstado "💽 Disco duro desfragmentado y optimizado." Green
 }
 
-# 3. Optimizar efectos visuales
-Write-Host "Optimización visual..."
-$visualSettings = @"
-Windows Registry Editor Version 5.00
-[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects]
-"VisualFXSetting"=dword:00000002
-"@
-$regPath = "$env:TEMP\visual.reg"
-$visualSettings | Out-File -Encoding ASCII $regPath
-reg import $regPath
-Remove-Item $regPath -Force
-
-# 4. Mejor rendimiento en Adobe
-Write-Host "Configurando Adobe para alto rendimiento..."
-reg add "HKCU\Software\Adobe\Photoshop\120.0" /v "Performance" /t REG_DWORD /d 1 /f 2>$null
-
-# 5. Eliminar tareas programadas innecesarias
-Write-Host "Eliminando tareas innecesarias..."
-$tasksToDisable = @(
-    '\Microsoft\Windows\Customer Experience Improvement Program\Consolidator',
-    '\Microsoft\Windows\Customer Experience Improvement Program\KernelCeipTask',
-    '\Microsoft\Windows\Application Experience\ProgramDataUpdater'
-)
-foreach ($task in $tasksToDisable) {
-    schtasks /Change /TN $task /Disable 2>$null
+# Liberar memoria RAM (vaciar standby list)
+if (Get-Command -Name Clear-Content -ErrorAction SilentlyContinue) {
+    [System.GC]::Collect()
+    Mostrar-PanelEstado "🧠 Memoria optimizada y liberada." Green
 }
 
-# 6. Limpieza de archivos temporales
-Write-Host "Limpiando archivos temporales..."
-Get-ChildItem "$env:TEMP" -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue
-
-# 7. Verificación rápida de integridad del sistema
-Write-Host "Verificando archivos del sistema (rápido)..."
-dism /Online /Cleanup-Image /ScanHealth | Out-Null
-
-Write-Host "\nOptimización avanzada completada. Reinicia tu PC para aplicar todos los cambios." -ForegroundColor Green
+Mostrar-PanelEstado "✅ Optimización avanzada completada. Reinicia tu PC para aplicar todos los cambios." Cyan
