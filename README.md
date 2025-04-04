@@ -56,4 +56,4 @@ Mantiene el sistema en óptimas condiciones, ejecutándose de forma regular. Pre
 3. **Edita o crea el archivo `README.md`.**  
 4. **Pega el contenido y guarda los cambios.**  
 
-✅ ¡Así de fácil! Ahora cualquiera podrá ejecutar tus scripts con un solo comando. 🚀😃
+✅ ¡Así de fácil! es ejecutar los scripts con un solo comando en Powershell. 🚀😃
