@@ -119,6 +119,7 @@ Write-Host "=============================\n=== MANTENIMIENTO DE WINDOWS PARA DIS
 Write-Host "Este proceso puede tardar entre 5 y 15 minutos." -ForegroundColor Yellow
 Write-Host "¡Comenzamos!" -ForegroundColor Green
 
+# Ejecución de las funciones de mantenimiento
 Limpiar-Temporales
 Reparar-ArchivosSistemas
 Revisar-EspacioDisco
@@ -127,6 +128,32 @@ Optimizar-RAM
 Optimizar-Adobe
 
 Write-Host "=============================\nMantenimiento completado con éxito." -ForegroundColor Green
-Start-Sleep -Seconds 10
-Write-Host "El script se cerrará en 10 segundos..." -ForegroundColor Cyan
-Start-Sleep -Seconds 10
+
+# Espera de 10 segundos antes de continuar
+for ($i = 10; $i -gt 0; $i--) {
+    Write-Host "El script se cerrará en $i segundos..." -ForegroundColor Yellow
+    Start-Sleep -Seconds 1
+}
+
+# Preguntar si desea programar el script para la próxima ejecución
+$programar = Read-Host "¿Quieres programar este mantenimiento para ejecutarse cada lunes? (s/n)"
+if ($programar -eq 's') {
+    $fecha = (Get-Date).AddDays(7).ToString("yyyy-MM-dd")
+    $hora = Read-Host "¿A qué hora deseas programarlo? (HH:mm)"
+    $programarCommand = "powershell.exe -File `"$scriptPath`""
+    $taskAction = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`""
+    $taskTrigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday -At $hora
+    Register-ScheduledTask -Action $taskAction -Trigger $taskTrigger -TaskName "MantenimientoPC" -Description "Mantenimiento semanal para optimizar PC"
+    Write-Host "Mantenimiento programado para el lunes a las $hora." -ForegroundColor Green
+}
+
+# Preguntar si desea reiniciar el equipo
+$reiniciar = Read-Host "¿Quieres reiniciar el sistema ahora? (s/n)"
+if ($reiniciar -eq 's') {
+    Write-Host "Reiniciando el sistema..." -ForegroundColor Cyan
+    Restart-Computer
+} else {
+    Write-Host "No se realizará el reinicio." -ForegroundColor Yellow
+}
+
+Read-Host -Prompt "Presiona ENTER para salir"
