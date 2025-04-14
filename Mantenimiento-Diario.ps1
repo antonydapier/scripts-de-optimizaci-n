@@ -54,12 +54,19 @@ function Limpiar-Temporales {
 
     $limpiarPapelera = Read-Host "¿Deseas vaciar la Papelera de reciclaje? (s/n)"
     if ($limpiarPapelera -eq "s") {
-        try {
-            Clear-RecycleBin -Force
-            Write-Host "Papelera vaciada." -ForegroundColor Green
-        } catch {
-            Log-Error "Error al vaciar la papelera: $_"
-        }
+        Limpiar-Papelera
+    }
+}
+
+function Limpiar-Papelera {
+    Write-Host "`nVaciando la Papelera de reciclaje..." -ForegroundColor Yellow
+    try {
+        $shell = New-Object -ComObject Shell.Application
+        $recycleBin = $shell.Namespace('shell:::{645FF040-5081-101B-9F08-00AA002F954E}')
+        $recycleBin.Items() | ForEach-Object { $_.InvokeVerb('delete') }
+        Write-Host "Papelera vaciada." -ForegroundColor Green
+    } catch {
+        Log-Error "Error al vaciar la papelera: $_"
     }
 }
 
@@ -112,65 +119,4 @@ function Optimizar-Adobe {
             Stop-Process -Name $app -Force -ErrorAction SilentlyContinue
         }
         try {
-            Remove-Item "$env:APPDATA\Adobe\*" -Recurse -Force -ErrorAction SilentlyContinue
-            Write-Host "Caché de Adobe eliminada." -ForegroundColor Green
-        } catch {
-            Log-Error "Error al limpiar Adobe: $_"
-        }
-    } else {
-        Write-Host "Se omitió limpieza de Adobe." -ForegroundColor Yellow
-    }
-}
-
-# ==============================
-# EJECUCIÓN DEL MANTENIMIENTO
-# ==============================
-
-Verificar-Administrador
-if (-not (Verificar-Conexion)) { exit }
-
-Write-Host "`n============================="
-Write-Host "=== MANTENIMIENTO INICIADO ===" -ForegroundColor Cyan
-Write-Host "Este proceso puede tardar entre 5 y 15 minutos..." -ForegroundColor Yellow
-Write-Host "¡Comenzamos, Antony!" -ForegroundColor Green
-
-Limpiar-Temporales
-Reparar-ArchivosSistemas
-Revisar-EspacioDisco
-Optimizar-Red
-Optimizar-RAM
-Optimizar-Adobe
-
-Write-Host "`nMantenimiento finalizado correctamente." -ForegroundColor Green
-
-# ==============================
-# PROGRAMAR EJECUCIÓN AUTOMÁTICA
-# ==============================
-
-$programar = Read-Host "¿Deseas programar este mantenimiento para cada lunes? (s/n)"
-if ($programar -eq 's') {
-    try {
-        $hora = Read-Host "¿A qué hora quieres programarlo? (ej. 09:00)"
-        $scriptPath = $MyInvocation.MyCommand.Path
-        $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`"" 
-        $trigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday -At (Get-Date "01/01/2000 $hora")
-        Register-ScheduledTask -Action $action -Trigger $trigger -TaskName "MantenimientoPC" -Description "Mantenimiento semanal" -Force
-        Write-Host "Script programado para cada lunes a las $hora." -ForegroundColor Green
-    } catch {
-        Log-Error "Error al programar la tarea: $_"
-    }
-}
-
-# ==============================
-# OPCIÓN DE REINICIO
-# ==============================
-
-$reiniciar = Read-Host "¿Deseas reiniciar el sistema ahora? (s/n)"
-if ($reiniciar -eq 's') {
-    Write-Host "Reiniciando..." -ForegroundColor Cyan
-    Restart-Computer
-} else {
-    Write-Host "Sin reinicio. ¡Listo para seguir diseñando!" -ForegroundColor Green
-}
-
-Read-Host -Prompt "Presiona ENTER para cerrar"
+            Remove-Item "$env:APPDATA\
