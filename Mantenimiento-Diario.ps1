@@ -34,7 +34,7 @@ function Limpiar-Temporales {
                 Remove-Item "$path\*" -Recurse -Force -ErrorAction SilentlyContinue
                 Write-Host "Archivos temporales eliminados en $path." -ForegroundColor Green
             } catch {
-                Log-Error "Error al eliminar archivos en $path: $_"
+                Log-Error "Error al eliminar archivos en ${path}: $_"
             }
         }
     }
