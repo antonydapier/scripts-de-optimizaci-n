@@ -1,4 +1,4 @@
-Write-Host "`nIniciando el mantenimiento de la PC de diseno..." -ForegroundColor Cyan
+Write-Host "`nIniciando el mantenimiento de la PC de diseño..." -ForegroundColor Cyan
 
 # ==============================
 # FUNCIONES
@@ -57,17 +57,18 @@ function Limpiar-Temporales {
 function Limpiar-Papelera {
     Write-Host "`nVaciando la Papelera de reciclaje..." -ForegroundColor Yellow
     try {
-        # Usar Shell.Application para acceder a la Papelera de reciclaje
+        # Usar Shell.Application para vaciar la Papelera sin preguntar por cada archivo
         $shell = New-Object -ComObject Shell.Application
         $recycleBin = $shell.Namespace('shell:::{645FF040-5081-101B-9F08-00AA002F954E}')
         if ($recycleBin) {
             $items = $recycleBin.Items()
             if ($items.Count -gt 0) {
-                # Aquí eliminamos todos los elementos de la Papelera sin intervención
-                $items | ForEach-Object { $_.InvokeVerb('delete') }
+                $items | ForEach-Object { 
+                    $_.InvokeVerb('delete') 
+                }
                 Write-Host "Papelera vaciada." -ForegroundColor Green
             } else {
-                Write-Host "La Papelera ya estaba vacia." -ForegroundColor Green
+                Write-Host "La Papelera ya estaba vacía." -ForegroundColor Green
             }
         } else {
             Log-Error "No se pudo acceder a la Papelera de reciclaje."
@@ -88,7 +89,7 @@ function Optimizar-RAM {
 }
 
 function Reparar-ArchivosSistemas {
-    Write-Host "`nEjecutando reparacion de archivos SFC y DISM..." -ForegroundColor Yellow
+    Write-Host "`nEjecutando reparación de archivos SFC y DISM..." -ForegroundColor Yellow
     try {
         sfc /scannow
         Dism /Online /Cleanup-Image /RestoreHealth
@@ -106,7 +107,7 @@ function Revisar-EspacioDisco {
 }
 
 function Optimizar-Red {
-    Write-Host "`nOptimizando red (sin tocar configuraciones criticas)..." -ForegroundColor Yellow
+    Write-Host "`nOptimizando red (sin tocar configuraciones críticas)..." -ForegroundColor Yellow
     try {
         $regPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings"
         Set-ItemProperty -Path $regPath -Name "MaxConnectionsPerServer" -Value 10
@@ -132,12 +133,12 @@ function Optimizar-Adobe {
             Log-Error "Error al limpiar Adobe: $_"
         }
     } else {
-        Write-Host "Se omito limpieza de Adobe." -ForegroundColor Yellow
+        Write-Host "Se omitió limpieza de Adobe." -ForegroundColor Yellow
     }
 }
 
 # ==============================
-# EJECUCION DEL MANTENIMIENTO
+# EJECUCIÓN DEL MANTENIMIENTO
 # ==============================
 
 Verificar-Administrador
@@ -158,13 +159,13 @@ Optimizar-Adobe
 Write-Host "`nMantenimiento finalizado correctamente." -ForegroundColor Green
 
 # ==============================
-# PROGRAMAR EJECUCION AUTOMATICA
+# PROGRAMAR EJECUCIÓN AUTOMÁTICA
 # ==============================
 
 $programar = Read-Host "¿Deseas programar este mantenimiento para cada lunes? (s/n)"
 if ($programar -eq 's') {
     try {
-        $hora = Read-Host "¿A que hora quieres programarlo? (ej. 09:00)"
+        $hora = Read-Host "¿A qué hora quieres programarlo? (ej. 09:00)"
         $scriptPath = $MyInvocation.MyCommand.Path
         $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`"" 
         $trigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday -At (Get-Date "01/01/2000 $hora")
@@ -176,7 +177,7 @@ if ($programar -eq 's') {
 }
 
 # ==============================
-# OPCION DE REINICIO
+# OPCIÓN DE REINICIO
 # ==============================
 
 $reiniciar = Read-Host "¿Deseas reiniciar el sistema ahora? (s/n)"
@@ -184,7 +185,7 @@ if ($reiniciar -eq 's') {
     Write-Host "Reiniciando..." -ForegroundColor Cyan
     Restart-Computer
 } else {
-    Write-Host "Sin reinicio. ¡Listo para seguir diseniando!" -ForegroundColor Green
+    Write-Host "Sin reinicio. ¡Listo para seguir diseñando!" -ForegroundColor Green
 }
 
 Read-Host -Prompt "Presiona ENTER para cerrar"
