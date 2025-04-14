@@ -1,31 +1,132 @@
-# -------------- 6. FINALIZAR --------------
-Write-Host "Mantenimiento completado. ¡Tu PC está lista para trabajar esta semana!" -ForegroundColor Cyan
-Write-Host "❗ Recuerda que el proceso puede tardar entre 5 y 15 minutos. No cierres la ventana hasta que termine." -ForegroundColor Yellow
+Write-Host "Iniciando la optimización de la PC..." -ForegroundColor Cyan
 
-# Preguntar si desea programar la limpieza
-$programar = Read-Host "¿Te gustaría programar esta limpieza para que se ejecute automáticamente cada lunes al iniciar? (S/N)"
-if ($programar -eq "S" -or $programar -eq "s") {
-    $Trigger = New-ScheduledTaskTrigger -AtStartup -DaysOfWeek Monday
-    $Accion = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-ExecutionPolicy Bypass -File C:\ruta\a\tu\script\pc-mantenimiento-diario.ps1"
-    Register-ScheduledTask -Action $Accion -Trigger $Trigger -TaskName "Mantenimiento Diario de PC" -Description "Script de mantenimiento automático para optimizar y limpiar tu PC semanalmente." -Force
-    Write-Host "Mantenimiento automático programado correctamente para ejecutarse cada lunes al iniciar." -ForegroundColor Green
-} else {
-    Write-Host "No se programó la limpieza automática. Puedes ejecutar el script manualmente cuando lo desees." -ForegroundColor Yellow
+function Verificar-Administrador {
+    if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+        Write-Host "Este script necesita ejecutarse como Administrador. Intentando elevar permisos..." -ForegroundColor Red
+        $scriptPath = $MyInvocation.MyCommand.Path
+        Start-Process powershell -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `\"$scriptPath`\"" -Verb RunAs
+        exit
+    }
 }
 
-# Preguntar si desea reiniciar la PC ahora
-$reiniciar = Read-Host "¿Te gustaría reiniciar tu PC ahora para aplicar los cambios? (S/N)"
-if ($reiniciar -eq "S" -or $reiniciar -eq "s") {
-    Write-Host "Reiniciando la PC..." -ForegroundColor Yellow
-    Restart-Computer -Force
-} else {
-    Write-Host "Recuerda reiniciar tu PC más tarde para asegurarte de que todos los cambios se apliquen correctamente." -ForegroundColor Yellow
-    Write-Host "PowerShell se cerrará en 5 segundos..." -ForegroundColor Yellow
-    Start-Sleep -Seconds 5
-    Exit
+function Verificar-Conexion {
+    Write-Host "Verificando conexión a Internet..." -ForegroundColor Yellow
+    if (-not (Test-Connection -ComputerName cloudflare.com -Count 1 -Quiet)) {
+        Write-Host "No hay conexión a Internet. Algunas acciones podrían no funcionar." -ForegroundColor Red
+        return $false
+    }
+    return $true
 }
 
-# Si el usuario no eligió reiniciar, esperar 10 segundos y reiniciar automáticamente
-Write-Host "Reiniciando automáticamente en 10 segundos..." -ForegroundColor Yellow
+function Log-Error {
+    param ([string]$message)
+    $logPath = "$env:USERPROFILE\MantenimientoErrorLog.txt"
+    Add-Content -Path $logPath -Value "$(Get-Date): ERROR: $message"
+    Write-Host "Error registrado: $message" -ForegroundColor Red
+}
+
+function Limpiar-Temporales {
+    Write-Host "=============================\nEliminando archivos temporales..." -ForegroundColor Yellow
+    $paths = @("$env:LOCALAPPDATA\Temp", "C:\\Windows\\Temp", "$env:TEMP")
+    foreach ($path in $paths) {
+        if (Test-Path $path) {
+            try {
+                Remove-Item "$path\*" -Recurse -Force -ErrorAction SilentlyContinue
+                Write-Host "Archivos temporales eliminados en $path." -ForegroundColor Green
+            } catch {
+                Log-Error "Error al eliminar archivos en $path: $_"
+            }
+        }
+    }
+}
+
+function Optimizar-RAM {
+    Write-Host "=============================\nLiberando RAM..." -ForegroundColor Yellow
+    try {
+        [System.GC]::Collect()
+        Write-Host "RAM optimizada." -ForegroundColor Green
+    } catch {
+        Log-Error "Error al liberar la RAM: $_"
+    }
+}
+
+function Reparar-ArchivosSistemas {
+    Write-Host "=============================\nEjecutando SFC..." -ForegroundColor Yellow
+    try {
+        sfc /scannow
+        Write-Host "SFC finalizado." -ForegroundColor Green
+    } catch {
+        Log-Error "Error al ejecutar SFC: $_"
+    }
+
+    Write-Host "=============================\nEjecutando DISM..." -ForegroundColor Yellow
+    try {
+        Dism /Online /Cleanup-Image /RestoreHealth
+        Write-Host "DISM finalizado." -ForegroundColor Green
+    } catch {
+        Log-Error "Error al ejecutar DISM: $_"
+    }
+}
+
+function Revisar-EspacioDisco {
+    Write-Host "=============================\nRevisando espacio en disco..." -ForegroundColor Yellow
+    Get-PSDrive -PSProvider FileSystem | ForEach-Object {
+        Write-Host "Disco $($_.Name): $([math]::Round($_.Used/1GB,2)) GB usados de $([math]::Round(($_.Used + $_.Free)/1GB,2)) GB." -ForegroundColor Green
+    }
+}
+
+function Optimizar-Red {
+    Write-Host "=============================\nOptimizando red..." -ForegroundColor Yellow
+    $regPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings"
+    try {
+        Set-ItemProperty -Path $regPath -Name "MaxConnectionsPerServer" -Value 10
+        Set-ItemProperty -Path $regPath -Name "MaxConnectionsPer1_0Server" -Value 10
+        Write-Host "Red optimizada." -ForegroundColor Green
+    } catch {
+        Log-Error "Error al optimizar la red: $_"
+    }
+}
+
+function Optimizar-Adobe {
+    Write-Host "=============================\nOptimizando programas de Adobe..." -ForegroundColor Yellow
+    $confirm = Read-Host "¿Deseas cerrar los programas de Adobe para limpiar la caché? (s/n)"
+    if ($confirm -eq 's') {
+        $apps = @("Photoshop", "Illustrator", "InDesign")
+        foreach ($app in $apps) {
+            $proceso = Get-Process -Name $app -ErrorAction SilentlyContinue
+            if ($proceso) {
+                Stop-Process -Name $app -Force
+            }
+        }
+        $adobeCachePath = "$env:APPDATA\Adobe"
+        if (Test-Path $adobeCachePath) {
+            try {
+                Remove-Item "$adobeCachePath\*" -Recurse -Force -ErrorAction SilentlyContinue
+                Write-Host "Caché de Adobe limpiada." -ForegroundColor Green
+            } catch {
+                Log-Error "Error al limpiar caché de Adobe: $_"
+            }
+        }
+    } else {
+        Write-Host "Se omitió la limpieza de caché de Adobe." -ForegroundColor Yellow
+    }
+}
+
+Verificar-Administrador
+if (-not (Verificar-Conexion)) { exit }
+
+Write-Host "=============================\n=== MANTENIMIENTO DE WINDOWS PARA DISEÑADORES ===" -ForegroundColor Cyan
+Write-Host "Este proceso puede tardar entre 5 y 15 minutos." -ForegroundColor Yellow
+Write-Host "¡Comenzamos!" -ForegroundColor Green
+
+Limpiar-Temporales
+Reparar-ArchivosSistemas
+Revisar-EspacioDisco
+Optimizar-Red
+Optimizar-RAM
+Optimizar-Adobe
+
+Write-Host "=============================\nMantenimiento completado con éxito." -ForegroundColor Green
 Start-Sleep -Seconds 10
-Restart-Computer -Force
+Write-Host "El script se cerrará en 10 segundos..." -ForegroundColor Cyan
+Start-Sleep -Seconds 10
