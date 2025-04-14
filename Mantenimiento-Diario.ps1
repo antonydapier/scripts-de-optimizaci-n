@@ -1,5 +1,5 @@
-Write-Host "`nIniciando el mantenimiento de la PC de diseño..." -ForegroundColor Cyan
-Write-Host "Una mente clara empieza por una máquina limpia. 💻✨" -ForegroundColor Magenta
+Write-Host "`Iniciando el mantenimiento de la PC..." -ForegroundColor Cyan
+Write-Host "Una mente clara empieza por una maquina limpia." -ForegroundColor Magenta
 
 # ==============================
 # FUNCIONES
