@@ -7,7 +7,7 @@ Write-Host "`nIniciando el mantenimiento de la PC de diseño..." -ForegroundColo
 function Verificar-Administrador {
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
         Write-Host "Este script necesita permisos de Administrador. Intentando elevar..." -ForegroundColor Red
-        Start-Process powershell "-NoProfile -ExecutionPolicy Bypass -File `"$($MyInvocation.MyCommand.Path)`"" -Verb RunAs
+        Start-Process powershell "-NoProfile -ExecutionPolicy Bypass -File `\"$($MyInvocation.MyCommand.Path)`\"" -Verb RunAs
         exit
     }
 }
@@ -30,7 +30,7 @@ function Log-Error {
 
 function Limpiar-Temporales {
     Write-Host "`nEliminando archivos temporales..." -ForegroundColor Yellow
-    $paths = @("$env:LOCALAPPDATA\Temp", "C:\Windows\Temp", "$env:TEMP")
+    $paths = @("$env:LOCALAPPDATA\Temp", "C:\\Windows\\Temp", "$env:TEMP")
     foreach ($path in $paths) {
         if (Test-Path $path) {
             try {
@@ -57,20 +57,8 @@ function Limpiar-Temporales {
 function Limpiar-Papelera {
     Write-Host "`nVaciando la Papelera de reciclaje..." -ForegroundColor Yellow
     try {
-        # Usar Shell.Application para vaciar la Papelera sin preguntar por cada archivo
-        $shell = New-Object -ComObject Shell.Application
-        $recycleBin = $shell.Namespace('shell:::{645FF040-5081-101B-9F08-00AA002F954E}')
-        if ($recycleBin) {
-            $items = $recycleBin.Items()
-            if ($items.Count -gt 0) {
-                $recycleBin.InvokeVerb('empty') # Vacía la Papelera sin confirmación por archivo
-                Write-Host "Papelera vaciada." -ForegroundColor Green
-            } else {
-                Write-Host "La Papelera ya estaba vacía." -ForegroundColor Green
-            }
-        } else {
-            Log-Error "No se pudo acceder a la Papelera de reciclaje."
-        }
+        Clear-RecycleBin -Confirm:$false
+        Write-Host "Papelera vaciada." -ForegroundColor Green
     } catch {
         Log-Error "Error al vaciar la papelera: $_"
     }
@@ -107,7 +95,7 @@ function Revisar-EspacioDisco {
 function Optimizar-Red {
     Write-Host "`nOptimizando red (sin tocar configuraciones críticas)..." -ForegroundColor Yellow
     try {
-        $regPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings"
+        $regPath = "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Internet Settings"
         Set-ItemProperty -Path $regPath -Name "MaxConnectionsPerServer" -Value 10
         Set-ItemProperty -Path $regPath -Name "MaxConnectionsPer1_0Server" -Value 10
         Write-Host "Red optimizada." -ForegroundColor Green
@@ -165,7 +153,7 @@ if ($programar -eq 's') {
     try {
         $hora = Read-Host "¿A qué hora quieres programarlo? (ej. 09:00)"
         $scriptPath = $MyInvocation.MyCommand.Path
-        $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`"" 
+        $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File `\"$scriptPath`\"" 
         $trigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday -At (Get-Date "01/01/2000 $hora")
         Register-ScheduledTask -Action $action -Trigger $trigger -TaskName "MantenimientoPC" -Description "Mantenimiento semanal" -Force
         Write-Host "Script programado para cada lunes a las $hora." -ForegroundColor Green
