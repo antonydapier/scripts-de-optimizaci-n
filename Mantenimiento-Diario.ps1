@@ -1,4 +1,4 @@
-Write-Host "`nIniciando el mantenimiento de la PC de diseño..." -ForegroundColor Cyan
+Write-Host "`nIniciando el mantenimiento de la PC de diseno..." -ForegroundColor Cyan
 
 # ==============================
 # FUNCIONES
@@ -13,9 +13,9 @@ function Verificar-Administrador {
 }
 
 function Verificar-Conexion {
-    Write-Host "Verificando conexión a Internet..." -ForegroundColor Yellow
+    Write-Host "Verificando conexion a Internet..." -ForegroundColor Yellow
     if (-not (Test-Connection -ComputerName 1.1.1.1 -Count 1 -Quiet)) {
-        Write-Host "No hay conexión. Algunas funciones pueden fallar." -ForegroundColor Red
+        Write-Host "No hay conexion. Algunas funciones pueden fallar." -ForegroundColor Red
         return $false
     }
     return $true
@@ -42,20 +42,16 @@ function Limpiar-Temporales {
         }
     }
 
-    $limpiarDescargas = Read-Host "¿Deseas limpiar la carpeta Descargas también? (s/n)"
-    if ($limpiarDescargas -eq "s") {
-        try {
-            Remove-Item "$env:USERPROFILE\Downloads\*" -Recurse -Force -ErrorAction SilentlyContinue
-            Write-Host "Descargas limpiadas." -ForegroundColor Green
-        } catch {
-            Log-Error "Error al limpiar Descargas: $_"
-        }
+    # Limpiar la carpeta de Descargas automáticamente
+    try {
+        Remove-Item "$env:USERPROFILE\Downloads\*" -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Host "Descargas limpiadas." -ForegroundColor Green
+    } catch {
+        Log-Error "Error al limpiar Descargas: $_"
     }
 
-    $limpiarPapelera = Read-Host "¿Deseas vaciar la Papelera de reciclaje? (s/n)"
-    if ($limpiarPapelera -eq "s") {
-        Limpiar-Papelera
-    }
+    # Vaciar la Papelera de reciclaje automáticamente
+    Limpiar-Papelera
 }
 
 function Limpiar-Papelera {
@@ -70,7 +66,7 @@ function Limpiar-Papelera {
                 $items | ForEach-Object { $_.InvokeVerb('delete') }
                 Write-Host "Papelera vaciada." -ForegroundColor Green
             } else {
-                Write-Host "La Papelera ya estaba vacía." -ForegroundColor Green
+                Write-Host "La Papelera ya estaba vacia." -ForegroundColor Green
             }
         } else {
             Log-Error "No se pudo acceder a la Papelera de reciclaje."
@@ -91,7 +87,7 @@ function Optimizar-RAM {
 }
 
 function Reparar-ArchivosSistemas {
-    Write-Host "`nEjecutando reparación de archivos SFC y DISM..." -ForegroundColor Yellow
+    Write-Host "`nEjecutando reparacion de archivos SFC y DISM..." -ForegroundColor Yellow
     try {
         sfc /scannow
         Dism /Online /Cleanup-Image /RestoreHealth
@@ -109,7 +105,7 @@ function Revisar-EspacioDisco {
 }
 
 function Optimizar-Red {
-    Write-Host "`nOptimizando red (sin tocar configuraciones críticas)..." -ForegroundColor Yellow
+    Write-Host "`nOptimizando red (sin tocar configuraciones criticas)..." -ForegroundColor Yellow
     try {
         $regPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings"
         Set-ItemProperty -Path $regPath -Name "MaxConnectionsPerServer" -Value 10
@@ -122,7 +118,7 @@ function Optimizar-Red {
 
 function Optimizar-Adobe {
     Write-Host "`nOptimizando Adobe (Photoshop, Illustrator, etc)..." -ForegroundColor Yellow
-    $confirm = Read-Host "¿Cerrar programas Adobe para limpiar caché? (s/n)"
+    $confirm = Read-Host "¿Cerrar programas Adobe para limpiar cache? (s/n)"
     if ($confirm -eq 's') {
         $apps = @("Photoshop", "Illustrator", "InDesign", "AfterFX")
         foreach ($app in $apps) {
@@ -130,17 +126,17 @@ function Optimizar-Adobe {
         }
         try {
             Remove-Item "$env:APPDATA\Adobe\*" -Recurse -Force -ErrorAction SilentlyContinue
-            Write-Host "Caché de Adobe eliminada." -ForegroundColor Green
+            Write-Host "Cache de Adobe eliminada." -ForegroundColor Green
         } catch {
             Log-Error "Error al limpiar Adobe: $_"
         }
     } else {
-        Write-Host "Se omitió limpieza de Adobe." -ForegroundColor Yellow
+        Write-Host "Se omito limpieza de Adobe." -ForegroundColor Yellow
     }
 }
 
 # ==============================
-# EJECUCIÓN DEL MANTENIMIENTO
+# EJECUCION DEL MANTENIMIENTO
 # ==============================
 
 Verificar-Administrador
@@ -161,13 +157,13 @@ Optimizar-Adobe
 Write-Host "`nMantenimiento finalizado correctamente." -ForegroundColor Green
 
 # ==============================
-# PROGRAMAR EJECUCIÓN AUTOMÁTICA
+# PROGRAMAR EJECUCION AUTOMATICA
 # ==============================
 
 $programar = Read-Host "¿Deseas programar este mantenimiento para cada lunes? (s/n)"
 if ($programar -eq 's') {
     try {
-        $hora = Read-Host "¿A qué hora quieres programarlo? (ej. 09:00)"
+        $hora = Read-Host "¿A que hora quieres programarlo? (ej. 09:00)"
         $scriptPath = $MyInvocation.MyCommand.Path
         $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`"" 
         $trigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday -At (Get-Date "01/01/2000 $hora")
@@ -179,7 +175,7 @@ if ($programar -eq 's') {
 }
 
 # ==============================
-# OPCIÓN DE REINICIO
+# OPCION DE REINICIO
 # ==============================
 
 $reiniciar = Read-Host "¿Deseas reiniciar el sistema ahora? (s/n)"
@@ -187,7 +183,8 @@ if ($reiniciar -eq 's') {
     Write-Host "Reiniciando..." -ForegroundColor Cyan
     Restart-Computer
 } else {
-    Write-Host "Sin reinicio. ¡Listo para seguir diseñando!" -ForegroundColor Green
+    Write-Host "Sin reinicio. ¡Listo para seguir diseniando!" -ForegroundColor Green
 }
 
 Read-Host -Prompt "Presiona ENTER para cerrar"
+exit
