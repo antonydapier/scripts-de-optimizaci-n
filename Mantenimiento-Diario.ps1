@@ -24,8 +24,8 @@ function Verificar-Conexion {
 function Log-Error {
     param ([string]$message)
     $logPath = "$env:USERPROFILE\MantenimientoErrorLog.txt"
-    Add-Content -Path $logPath -Value "$(Get-Date): ERROR: $message"
-    Write-Host "⚠️ Error registrado: $message" -ForegroundColor Red
+    Add-Content -Path $logPath -Value "$(Get-Date): ERROR: ${message}"
+    Write-Host "⚠️ Error registrado: ${message}" -ForegroundColor Red
 }
 
 function Limpiar-Temporales {
@@ -35,7 +35,7 @@ function Limpiar-Temporales {
         if (Test-Path $path) {
             try {
                 Remove-Item "$path\*" -Recurse -Force -ErrorAction SilentlyContinue
-                Write-Host "✔️ Limpiado: $path" -ForegroundColor Green
+                Write-Host "✔️ Limpiado: ${path}" -ForegroundColor Green
             } catch {
                 Log-Error "Error al limpiar ${path}: $_"
             }
@@ -87,7 +87,7 @@ function Reparar-ArchivosSistemas {
 function Revisar-EspacioDisco {
     Write-Host "`n💽 Espacio en disco disponible:" -ForegroundColor Yellow
     Get-PSDrive -PSProvider FileSystem | ForEach-Object {
-        Write-Host "🗂 Unidad $($_.Name): $([math]::Round($_.Free/1GB,2)) GB libres de $([math]::Round($_.Used/1GB + $_.Free/1GB,2)) GB" -ForegroundColor Green
+        Write-Host "🗂 Unidad ${($_.Name)}: $([math]::Round($_.Free/1GB,2)) GB libres de $([math]::Round($_.Used/1GB + $_.Free/1GB,2)) GB" -ForegroundColor Green
     }
 }
 
