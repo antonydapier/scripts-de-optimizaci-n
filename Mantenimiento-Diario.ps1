@@ -1,4 +1,5 @@
 Write-Host "`nIniciando el mantenimiento de la PC de diseño..." -ForegroundColor Cyan
+Write-Host "Una mente clara empieza por una máquina limpia. 💻✨" -ForegroundColor Magenta
 
 # ==============================
 # FUNCIONES
@@ -42,7 +43,6 @@ function Limpiar-Temporales {
         }
     }
 
-    # Limpiar la carpeta de Descargas automáticamente
     try {
         Remove-Item "$env:USERPROFILE\Downloads\*" -Recurse -Force -ErrorAction SilentlyContinue
         Write-Host "Descargas limpiadas." -ForegroundColor Green
@@ -50,15 +50,30 @@ function Limpiar-Temporales {
         Log-Error "Error al limpiar Descargas: $_"
     }
 
-    # Vaciar la Papelera de reciclaje automáticamente sin confirmación por archivo
     Limpiar-Papelera
 }
 
 function Limpiar-Papelera {
     Write-Host "`nVaciando la Papelera de reciclaje..." -ForegroundColor Yellow
     try {
-        Clear-RecycleBin -Confirm:$false
-        Write-Host "Papelera vaciada." -ForegroundColor Green
+        $shell = New-Object -ComObject Shell.Application
+        $recycleBin = $shell.Namespace(0xA)
+
+        $items = $recycleBin.Items()
+        if ($items.Count -eq 0) {
+            Write-Host "La Papelera ya está vacía." -ForegroundColor Gray
+            return
+        }
+
+        $idioma = (Get-Culture).TwoLetterISOLanguageName
+        $comando = if ($idioma -eq 'en') { 'delete' } else { 'eliminar' }
+
+        $items | ForEach-Object {
+            $_.InvokeVerb($comando)
+        }
+
+        Start-Sleep -Seconds 2
+        Write-Host "Papelera vaciada correctamente." -ForegroundColor Green
     } catch {
         Log-Error "Error al vaciar la papelera: $_"
     }
