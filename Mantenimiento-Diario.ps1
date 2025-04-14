@@ -57,12 +57,13 @@ function Limpiar-Temporales {
 function Limpiar-Papelera {
     Write-Host "`nVaciando la Papelera de reciclaje..." -ForegroundColor Yellow
     try {
-        # Usar Shell.Application para obtener la Papelera de reciclaje
+        # Usar Shell.Application para acceder a la Papelera de reciclaje
         $shell = New-Object -ComObject Shell.Application
         $recycleBin = $shell.Namespace('shell:::{645FF040-5081-101B-9F08-00AA002F954E}')
         if ($recycleBin) {
             $items = $recycleBin.Items()
             if ($items.Count -gt 0) {
+                # Aquí eliminamos todos los elementos de la Papelera sin intervención
                 $items | ForEach-Object { $_.InvokeVerb('delete') }
                 Write-Host "Papelera vaciada." -ForegroundColor Green
             } else {
