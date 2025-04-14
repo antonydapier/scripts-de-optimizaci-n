@@ -107,25 +107,8 @@ function Optimizar-Adobe {
                 Log-Error "Error al limpiar caché de Adobe: $_"
             }
         }
-    } elseif ($confirm -eq 'n') {
+    } else {
         Write-Host "Se omitió la limpieza de caché de Adobe." -ForegroundColor Yellow
-    } else {
-        Write-Host "Respuesta no válida. Se omitió la limpieza de caché de Adobe." -ForegroundColor Red
-    }
-}
-
-function Programar-Reinicio {
-    $confirm = Read-Host "¿Deseas programar el reinicio cada lunes a las 7 AM? (s/n)"
-    if ($confirm -eq 's') {
-        $taskName = "Reinicio-PC"
-        $taskAction = New-ScheduledTaskAction -Execute "shutdown.exe" -Argument "/r /f /t 0"
-        $taskTrigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday -At "7:00AM"
-        Register-ScheduledTask -Action $taskAction -Trigger $taskTrigger -TaskName $taskName -Description "Reinicio programado de la PC"
-        Write-Host "Reinicio programado cada lunes a las 7 AM." -ForegroundColor Green
-    } elseif ($confirm -eq 'n') {
-        Write-Host "No se programó el reinicio." -ForegroundColor Yellow
-    } else {
-        Write-Host "Respuesta no válida. Se omitió la programación." -ForegroundColor Red
     }
 }
 
@@ -142,7 +125,34 @@ Revisar-EspacioDisco
 Optimizar-Red
 Optimizar-RAM
 Optimizar-Adobe
-Programar-Reinicio
 
 Write-Host "=============================\nMantenimiento completado con éxito." -ForegroundColor Green
-Read-Host -Prompt "Presiona ENTER para salir"
+
+# Cuenta regresiva
+$counter = 10
+Write-Host "El script se cerrará en $counter segundos..." -ForegroundColor Yellow
+while ($counter -gt 0) {
+    Start-Sleep -Seconds 1
+    $counter--
+    Write-Host "$counter segundos restantes..." -ForegroundColor Yellow
+}
+
+Write-Host "Ahora que la limpieza está completada, ¿deseas programar el mantenimiento para cada lunes?" -ForegroundColor Yellow
+$programar = Read-Host "Escribe 's' para programar o 'n' para omitir"
+
+if ($programar -eq 's') {
+    # Aquí va el código para programar el mantenimiento
+    Write-Host "Mantenimiento programado para los lunes." -ForegroundColor Green
+} else {
+    Write-Host "Mantenimiento no programado." -ForegroundColor Yellow
+}
+
+Write-Host "¿Deseas reiniciar el equipo ahora?" -ForegroundColor Yellow
+$reiniciar = Read-Host "Escribe 's' para reiniciar o 'n' para omitir"
+
+if ($reiniciar -eq 's') {
+    Restart-Computer -Force
+} else {
+    Write-Host "El script ha finalizado, gracias por utilizarlo. ¡Hasta la próxima!" -ForegroundColor Green
+    Start-Sleep -Seconds 3  # Da un poco más de tiempo para que puedas leer el mensaje final
+}
