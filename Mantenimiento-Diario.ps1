@@ -7,7 +7,7 @@ Write-Host "`n🛠 Iniciando el mantenimiento de la PC de diseño..." -Foregroun
 function Verificar-Administrador {
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
         Write-Host "⚠️ Este script necesita permisos de Administrador. Intentando elevar..." -ForegroundColor Red
-        Start-Process powershell "-NoProfile -ExecutionPolicy Bypass -File `\"$($MyInvocation.MyCommand.Path)`\"" -Verb RunAs
+        Start-Process powershell "-NoProfile -ExecutionPolicy Bypass -File `"$($MyInvocation.MyCommand.Path)`"" -Verb RunAs
         exit
     }
 }
@@ -30,14 +30,14 @@ function Log-Error {
 
 function Limpiar-Temporales {
     Write-Host "`n🧹 Eliminando archivos temporales..." -ForegroundColor Yellow
-    $paths = @("$env:LOCALAPPDATA\Temp", "C:\\Windows\\Temp", "$env:TEMP")
+    $paths = @("$env:LOCALAPPDATA\Temp", "C:\Windows\Temp", "$env:TEMP")
     foreach ($path in $paths) {
         if (Test-Path $path) {
             try {
                 Remove-Item "$path\*" -Recurse -Force -ErrorAction SilentlyContinue
                 Write-Host "✔️ Limpiado: $path" -ForegroundColor Green
             } catch {
-                Log-Error "Error al limpiar $path: $($_.Exception.Message)"
+                Log-Error "Error al limpiar ${path}: $_"
             }
         }
     }
@@ -48,7 +48,7 @@ function Limpiar-Temporales {
             Remove-Item "$env:USERPROFILE\Downloads\*" -Recurse -Force -ErrorAction SilentlyContinue
             Write-Host "✔️ Descargas limpiadas." -ForegroundColor Green
         } catch {
-            Log-Error "Error al limpiar Descargas: $($_.Exception.Message)"
+            Log-Error "Error al limpiar Descargas: $_"
         }
     }
 
@@ -58,7 +58,7 @@ function Limpiar-Temporales {
             Clear-RecycleBin -Force
             Write-Host "🗑 Papelera vaciada." -ForegroundColor Green
         } catch {
-            Log-Error "Error al vaciar la papelera: $($_.Exception.Message)"
+            Log-Error "Error al vaciar la papelera: $_"
         }
     }
 }
@@ -69,7 +69,7 @@ function Optimizar-RAM {
         [System.GC]::Collect()
         Write-Host "✔️ RAM liberada." -ForegroundColor Green
     } catch {
-        Log-Error "Error al liberar RAM: $($_.Exception.Message)"
+        Log-Error "Error al liberar RAM: $_"
     }
 }
 
@@ -80,17 +80,14 @@ function Reparar-ArchivosSistemas {
         Dism /Online /Cleanup-Image /RestoreHealth
         Write-Host "✔️ Sistema reparado." -ForegroundColor Green
     } catch {
-        Log-Error "Error al ejecutar SFC/DISM: $($_.Exception.Message)"
+        Log-Error "Error al ejecutar SFC/DISM: $_"
     }
 }
 
 function Revisar-EspacioDisco {
     Write-Host "`n💽 Espacio en disco disponible:" -ForegroundColor Yellow
-    Get-CimInstance -ClassName Win32_LogicalDisk -Filter "DriveType=3" | ForEach-Object {
-        $unidad = $_.DeviceID
-        $libreGB = [math]::Round($_.FreeSpace / 1GB, 2)
-        $totalGB = [math]::Round($_.Size / 1GB, 2)
-        Write-Host "🗂 Unidad $unidad: $libreGB GB libres de $totalGB GB" -ForegroundColor Green
+    Get-PSDrive -PSProvider FileSystem | ForEach-Object {
+        Write-Host "🗂 Unidad $($_.Name): $([math]::Round($_.Free/1GB,2)) GB libres de $([math]::Round($_.Used/1GB + $_.Free/1GB,2)) GB" -ForegroundColor Green
     }
 }
 
@@ -102,7 +99,7 @@ function Optimizar-Red {
         Set-ItemProperty -Path $regPath -Name "MaxConnectionsPer1_0Server" -Value 10
         Write-Host "✔️ Red optimizada." -ForegroundColor Green
     } catch {
-        Log-Error "Error al optimizar red: $($_.Exception.Message)"
+        Log-Error "Error al optimizar red: $_"
     }
 }
 
@@ -118,7 +115,7 @@ function Optimizar-Adobe {
             Remove-Item "$env:APPDATA\Adobe\*" -Recurse -Force -ErrorAction SilentlyContinue
             Write-Host "✔️ Caché de Adobe eliminada." -ForegroundColor Green
         } catch {
-            Log-Error "Error al limpiar Adobe: $($_.Exception.Message)"
+            Log-Error "Error al limpiar Adobe: $_"
         }
     } else {
         Write-Host "⏭ Se omitió limpieza de Adobe." -ForegroundColor Yellow
@@ -155,12 +152,12 @@ if ($programar -eq 's') {
     try {
         $hora = Read-Host "¿A qué hora quieres programarlo? (ej. 09:00)"
         $scriptPath = $MyInvocation.MyCommand.Path
-        $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File `\"$scriptPath`\""
+        $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`"" 
         $trigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday -At (Get-Date "01/01/2000 $hora")
         Register-ScheduledTask -Action $action -Trigger $trigger -TaskName "MantenimientoPC" -Description "Mantenimiento semanal" -Force
         Write-Host "🗓 Script programado para cada lunes a las $hora." -ForegroundColor Green
     } catch {
-        Log-Error "Error al programar la tarea: $($_.Exception.Message)"
+        Log-Error "Error al programar la tarea: $_"
     }
 }
 
