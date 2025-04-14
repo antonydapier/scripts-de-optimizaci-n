@@ -1,10 +1,15 @@
-# Optimizar-PC-Avanzado.ps1 con interfaz amigable
-
+# Mostrar estado con mensaje y color
 function Mostrar-PanelEstado($mensaje, $color) {
     Write-Host ("=" * 60) -ForegroundColor DarkGray
     Write-Host $mensaje -ForegroundColor $color
     Write-Host ("=" * 60) -ForegroundColor DarkGray
     Start-Sleep -Milliseconds 800
+}
+
+# Verificar permisos de administrador
+if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+    Write-Host "❌ Este script necesita permisos de administrador. Ejecútalo como administrador." -ForegroundColor Red
+    exit
 }
 
 Mostrar-PanelEstado "Iniciando optimización avanzada de la PC..." Cyan
@@ -65,21 +70,14 @@ Mostrar-PanelEstado "🚀 Tareas de inicio optimizadas." Green
 Start-Process powershell -ArgumentList "-Command sfc /scannow" -Verb runAs
 Mostrar-PanelEstado "🛠️ Verificando y reparando archivos del sistema (puede tardar)..." Yellow
 
-# Reducir consumo y temperatura sin sacrificar rendimiento
+# Limpieza avanzada del sistema (WinSxS, componentes obsoletos)
+Mostrar-PanelEstado "🧽 Ejecutando limpieza avanzada de componentes del sistema..." Yellow
+Start-Process -FilePath "Dism.exe" -ArgumentList "/Online", "/Cleanup-Image", "/StartComponentCleanup", "/ResetBase" -Wait
+Mostrar-PanelEstado "🧼 Limpieza avanzada completada con éxito." Green
+
+# Reducir consumo y temperatura
 powercfg -setactive SCHEME_BALANCED
 powercfg -h off
-Mostrar-PanelEstado "🌡️ Plan de energía equilibrado activado para evitar sobrecalentamiento." Green
-
-# Desfragmentación y optimización de disco (solo si es HDD)
-if ((Get-PhysicalDisk | Where-Object { $_.MediaType -eq 'HDD' }).Count -gt 0) {
-    Optimize-Volume -DriveLetter C -Defrag -Verbose -ErrorAction SilentlyContinue
-    Mostrar-PanelEstado "💽 Disco duro desfragmentado y optimizado." Green
-}
-
-# Liberar memoria RAM (vaciar standby list)
-if (Get-Command -Name Clear-Content -ErrorAction SilentlyContinue) {
-    [System.GC]::Collect()
-    Mostrar-PanelEstado "🧠 Memoria optimizada y liberada." Green
-}
+Mostrar-PanelEstado "🌡️ Plan de energía configurado para evitar sobrecalentamiento." Green
 
 Mostrar-PanelEstado "✅ Optimización avanzada completada. Reinicia tu PC para aplicar todos los cambios." Cyan
