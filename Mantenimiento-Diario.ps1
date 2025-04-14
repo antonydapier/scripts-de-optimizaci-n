@@ -50,7 +50,7 @@ function Limpiar-Temporales {
         Log-Error "Error al limpiar Descargas: $_"
     }
 
-    # Vaciar la Papelera de reciclaje automáticamente
+    # Vaciar la Papelera de reciclaje automáticamente sin confirmación por archivo
     Limpiar-Papelera
 }
 
@@ -63,9 +63,7 @@ function Limpiar-Papelera {
         if ($recycleBin) {
             $items = $recycleBin.Items()
             if ($items.Count -gt 0) {
-                $items | ForEach-Object { 
-                    $_.InvokeVerb('delete') 
-                }
+                $recycleBin.InvokeVerb('empty') # Vacía la Papelera sin confirmación por archivo
                 Write-Host "Papelera vaciada." -ForegroundColor Green
             } else {
                 Write-Host "La Papelera ya estaba vacía." -ForegroundColor Green
