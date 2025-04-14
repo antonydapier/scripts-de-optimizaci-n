@@ -1,11 +1,7 @@
-Write-Host ""
-Write-Host "============================="
 Write-Host "Iniciando la optimización de la PC..." -ForegroundColor Cyan
-Write-Host "============================="
 
 function Verificar-Administrador {
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
-        Write-Host ""
         Write-Host "Este script necesita ejecutarse como Administrador. Intentando elevar permisos..." -ForegroundColor Red
         $scriptPath = $MyInvocation.MyCommand.Path
         Start-Process powershell -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `\"$scriptPath`\"" -Verb RunAs
@@ -14,7 +10,6 @@ function Verificar-Administrador {
 }
 
 function Verificar-Conexion {
-    Write-Host ""
     Write-Host "Verificando conexión a Internet..." -ForegroundColor Yellow
     if (-not (Test-Connection -ComputerName cloudflare.com -Count 1 -Quiet)) {
         Write-Host "No hay conexión a Internet. Algunas acciones podrían no funcionar." -ForegroundColor Red
@@ -31,9 +26,7 @@ function Log-Error {
 }
 
 function Limpiar-Temporales {
-    Write-Host ""
-    Write-Host "============================="
-    Write-Host "Eliminando archivos temporales..." -ForegroundColor Yellow
+    Write-Host "=============================\nEliminando archivos temporales..." -ForegroundColor Yellow
     $paths = @("$env:LOCALAPPDATA\Temp", "C:\\Windows\\Temp", "$env:TEMP")
     foreach ($path in $paths) {
         if (Test-Path $path) {
@@ -48,9 +41,7 @@ function Limpiar-Temporales {
 }
 
 function Optimizar-RAM {
-    Write-Host ""
-    Write-Host "============================="
-    Write-Host "Liberando RAM..." -ForegroundColor Yellow
+    Write-Host "=============================\nLiberando RAM..." -ForegroundColor Yellow
     try {
         [System.GC]::Collect()
         Write-Host "RAM optimizada." -ForegroundColor Green
@@ -60,9 +51,7 @@ function Optimizar-RAM {
 }
 
 function Reparar-ArchivosSistemas {
-    Write-Host ""
-    Write-Host "============================="
-    Write-Host "Ejecutando SFC..." -ForegroundColor Yellow
+    Write-Host "=============================\nEjecutando SFC..." -ForegroundColor Yellow
     try {
         sfc /scannow
         Write-Host "SFC finalizado." -ForegroundColor Green
@@ -70,9 +59,7 @@ function Reparar-ArchivosSistemas {
         Log-Error "Error al ejecutar SFC: $_"
     }
 
-    Write-Host ""
-    Write-Host "============================="
-    Write-Host "Ejecutando DISM..." -ForegroundColor Yellow
+    Write-Host "=============================\nEjecutando DISM..." -ForegroundColor Yellow
     try {
         Dism /Online /Cleanup-Image /RestoreHealth
         Write-Host "DISM finalizado." -ForegroundColor Green
@@ -82,18 +69,14 @@ function Reparar-ArchivosSistemas {
 }
 
 function Revisar-EspacioDisco {
-    Write-Host ""
-    Write-Host "============================="
-    Write-Host "Revisando espacio en disco..." -ForegroundColor Yellow
+    Write-Host "=============================\nRevisando espacio en disco..." -ForegroundColor Yellow
     Get-PSDrive -PSProvider FileSystem | ForEach-Object {
         Write-Host "Disco $($_.Name): $([math]::Round($_.Used/1GB,2)) GB usados de $([math]::Round(($_.Used + $_.Free)/1GB,2)) GB." -ForegroundColor Green
     }
 }
 
 function Optimizar-Red {
-    Write-Host ""
-    Write-Host "============================="
-    Write-Host "Optimizando red..." -ForegroundColor Yellow
+    Write-Host "=============================\nOptimizando red..." -ForegroundColor Yellow
     $regPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings"
     try {
         Set-ItemProperty -Path $regPath -Name "MaxConnectionsPerServer" -Value 10
@@ -105,9 +88,7 @@ function Optimizar-Red {
 }
 
 function Optimizar-Adobe {
-    Write-Host ""
-    Write-Host "============================="
-    Write-Host "Optimizando programas de Adobe..." -ForegroundColor Yellow
+    Write-Host "=============================\nOptimizando programas de Adobe..." -ForegroundColor Yellow
     $confirm = Read-Host "¿Deseas cerrar los programas de Adobe para limpiar la caché? (s/n)"
     if ($confirm -eq 's') {
         $apps = @("Photoshop", "Illustrator", "InDesign")
@@ -126,17 +107,32 @@ function Optimizar-Adobe {
                 Log-Error "Error al limpiar caché de Adobe: $_"
             }
         }
-    } else {
+    } elseif ($confirm -eq 'n') {
         Write-Host "Se omitió la limpieza de caché de Adobe." -ForegroundColor Yellow
+    } else {
+        Write-Host "Respuesta no válida. Se omitió la limpieza de caché de Adobe." -ForegroundColor Red
+    }
+}
+
+function Programar-Reinicio {
+    $confirm = Read-Host "¿Deseas programar el reinicio cada lunes a las 7 AM? (s/n)"
+    if ($confirm -eq 's') {
+        $taskName = "Reinicio-PC"
+        $taskAction = New-ScheduledTaskAction -Execute "shutdown.exe" -Argument "/r /f /t 0"
+        $taskTrigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday -At "7:00AM"
+        Register-ScheduledTask -Action $taskAction -Trigger $taskTrigger -TaskName $taskName -Description "Reinicio programado de la PC"
+        Write-Host "Reinicio programado cada lunes a las 7 AM." -ForegroundColor Green
+    } elseif ($confirm -eq 'n') {
+        Write-Host "No se programó el reinicio." -ForegroundColor Yellow
+    } else {
+        Write-Host "Respuesta no válida. Se omitió la programación." -ForegroundColor Red
     }
 }
 
 Verificar-Administrador
 if (-not (Verificar-Conexion)) { exit }
 
-Write-Host ""
-Write-Host "============================="
-Write-Host "=== MANTENIMIENTO DE WINDOWS PARA DISEÑADORES ===" -ForegroundColor Cyan
+Write-Host "=============================\n=== MANTENIMIENTO DE WINDOWS PARA DISEÑADORES ===" -ForegroundColor Cyan
 Write-Host "Este proceso puede tardar entre 5 y 15 minutos." -ForegroundColor Yellow
 Write-Host "¡Comenzamos!" -ForegroundColor Green
 
@@ -146,8 +142,7 @@ Revisar-EspacioDisco
 Optimizar-Red
 Optimizar-RAM
 Optimizar-Adobe
+Programar-Reinicio
 
-Write-Host ""
-Write-Host "============================="
-Write-Host "Mantenimiento completado con éxito." -ForegroundColor Green
+Write-Host "=============================\nMantenimiento completado con éxito." -ForegroundColor Green
 Read-Host -Prompt "Presiona ENTER para salir"
