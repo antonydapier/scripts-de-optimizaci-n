@@ -1,83 +1,153 @@
-# Mostrar estado con mensaje y color
-function Mostrar-PanelEstado($mensaje, $color) {
-    Write-Host ("=" * 60) -ForegroundColor DarkGray
-    Write-Host $mensaje -ForegroundColor $color
-    Write-Host ("=" * 60) -ForegroundColor DarkGray
-    Start-Sleep -Milliseconds 800
-}
+Write-Host ""
+Write-Host "============================="
+Write-Host "Iniciando la optimización de la PC..." -ForegroundColor Cyan
+Write-Host "============================="
 
-# Verificar permisos de administrador
-if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
-    Write-Host "❌ Este script necesita permisos de administrador. Ejecútalo como administrador." -ForegroundColor Red
-    exit
-}
-
-Mostrar-PanelEstado "Iniciando optimización avanzada de la PC..." Cyan
-
-# Eliminar bloatware conocido sin afectar diseño
-Get-AppxPackage *xbox* | Remove-AppxPackage -ErrorAction SilentlyContinue
-Get-AppxPackage *bing* | Remove-AppxPackage -ErrorAction SilentlyContinue
-Get-AppxPackage *zune* | Remove-AppxPackage -ErrorAction SilentlyContinue
-Get-AppxPackage *solitaire* | Remove-AppxPackage -ErrorAction SilentlyContinue
-Get-AppxPackage *3d* | Remove-AppxPackage -ErrorAction SilentlyContinue
-Get-AppxPackage *people* | Remove-AppxPackage -ErrorAction SilentlyContinue
-Mostrar-PanelEstado "✅ Bloatware eliminado correctamente." Green
-
-# Deshabilitar servicios innecesarios para diseñadores
-$serviciosADesactivar = @("DiagTrack","RetailDemo","Fax","RemoteRegistry","XblGameSave","MapsBroker","WMPNetworkSvc","dmwappushsvc")
-foreach ($servicio in $serviciosADesactivar) {
-    Get-Service -Name $servicio -ErrorAction SilentlyContinue | Set-Service -StartupType Disabled -ErrorAction SilentlyContinue
-}
-Mostrar-PanelEstado "🛑 Servicios innecesarios deshabilitados." Green
-
-# Mantener servicios esenciales de diseño
-$serviciosEsenciales = @("Spooler","PrintWorkflowUserSvc","FDResPub","LanmanServer","LanmanWorkstation")
-foreach ($servicio in $serviciosEsenciales) {
-    Get-Service -Name $servicio -ErrorAction SilentlyContinue | Set-Service -StartupType Automatic -ErrorAction SilentlyContinue
-}
-Mostrar-PanelEstado "🔒 Servicios esenciales protegidos (impresión y red)." Yellow
-
-# Optimizar efectos visuales
-$visuals = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects"
-Set-ItemProperty -Path $visuals -Name VisualFXSetting -Value 2
-Mostrar-PanelEstado "✨ Efectos visuales optimizados para rendimiento." Green
-
-# Priorizar rendimiento para Adobe
-$adobeKeys = "HKCU:\Software\Adobe", "HKLM:\SOFTWARE\Adobe"
-foreach ($key in $adobeKeys) {
-    if (Test-Path $key) {
-        New-ItemProperty -Path $key -Name "PerformanceMode" -Value 1 -PropertyType DWord -Force -ErrorAction SilentlyContinue
+function Verificar-Administrador {
+    if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+        Write-Host ""
+        Write-Host "Este script necesita ejecutarse como Administrador. Intentando elevar permisos..." -ForegroundColor Red
+        $scriptPath = $MyInvocation.MyCommand.Path
+        Start-Process powershell -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `\"$scriptPath`\"" -Verb RunAs
+        exit
     }
 }
-Mostrar-PanelEstado "🎨 Adobe Suite configurado para mejor rendimiento." Green
 
-# Limpieza de archivos temporales, cachés y miniaturas
-$paths = @(
-    "$env:TEMP\*",
-    "$env:windir\Temp\*",
-    "$env:USERPROFILE\AppData\Local\Microsoft\Windows\Explorer\thumbcache_*.db"
-)
-foreach ($path in $paths) {
-    Remove-Item -Path $path -Recurse -Force -ErrorAction SilentlyContinue
+function Verificar-Conexion {
+    Write-Host ""
+    Write-Host "Verificando conexión a Internet..." -ForegroundColor Yellow
+    if (-not (Test-Connection -ComputerName cloudflare.com -Count 1 -Quiet)) {
+        Write-Host "No hay conexión a Internet. Algunas acciones podrían no funcionar." -ForegroundColor Red
+        return $false
+    }
+    return $true
 }
-Mostrar-PanelEstado "🧹 Limpieza profunda de archivos temporales completada." Green
 
-# Optimizar tareas de inicio
-Get-ScheduledTask | Where-Object { $_.TaskName -like "*Office*" -or $_.TaskName -like "*Edge*" } | Disable-ScheduledTask -ErrorAction SilentlyContinue
-Mostrar-PanelEstado "🚀 Tareas de inicio optimizadas." Green
+function Log-Error {
+    param ([string]$message)
+    $logPath = "$env:USERPROFILE\MantenimientoErrorLog.txt"
+    Add-Content -Path $logPath -Value "$(Get-Date): ERROR: $message"
+    Write-Host "Error registrado: $message" -ForegroundColor Red
+}
 
-# Verificar y reparar archivos del sistema (en segundo plano)
-Start-Process powershell -ArgumentList "-Command sfc /scannow" -Verb runAs
-Mostrar-PanelEstado "🛠️ Verificando y reparando archivos del sistema (puede tardar)..." Yellow
+function Limpiar-Temporales {
+    Write-Host ""
+    Write-Host "============================="
+    Write-Host "Eliminando archivos temporales..." -ForegroundColor Yellow
+    $paths = @("$env:LOCALAPPDATA\Temp", "C:\\Windows\\Temp", "$env:TEMP")
+    foreach ($path in $paths) {
+        if (Test-Path $path) {
+            try {
+                Remove-Item "$path\*" -Recurse -Force -ErrorAction SilentlyContinue
+            } catch {
+                Log-Error "Error al eliminar archivos en $path: $_"
+            }
+        }
+    }
+    Write-Host "Temporales eliminados." -ForegroundColor Green
+}
 
-# Limpieza avanzada del sistema (WinSxS, componentes obsoletos)
-Mostrar-PanelEstado "🧽 Ejecutando limpieza avanzada de componentes del sistema..." Yellow
-Start-Process -FilePath "Dism.exe" -ArgumentList "/Online", "/Cleanup-Image", "/StartComponentCleanup", "/ResetBase" -Wait
-Mostrar-PanelEstado "🧼 Limpieza avanzada completada con éxito." Green
+function Optimizar-RAM {
+    Write-Host ""
+    Write-Host "============================="
+    Write-Host "Liberando RAM..." -ForegroundColor Yellow
+    try {
+        [System.GC]::Collect()
+        Write-Host "RAM optimizada." -ForegroundColor Green
+    } catch {
+        Log-Error "Error al liberar la RAM: $_"
+    }
+}
 
-# Reducir consumo y temperatura
-powercfg -setactive SCHEME_BALANCED
-powercfg -h off
-Mostrar-PanelEstado "🌡️ Plan de energía configurado para evitar sobrecalentamiento." Green
+function Reparar-ArchivosSistemas {
+    Write-Host ""
+    Write-Host "============================="
+    Write-Host "Ejecutando SFC..." -ForegroundColor Yellow
+    try {
+        sfc /scannow
+        Write-Host "SFC finalizado." -ForegroundColor Green
+    } catch {
+        Log-Error "Error al ejecutar SFC: $_"
+    }
 
-Mostrar-PanelEstado "✅ Optimización avanzada completada. Reinicia tu PC para aplicar todos los cambios." Cyan
+    Write-Host ""
+    Write-Host "============================="
+    Write-Host "Ejecutando DISM..." -ForegroundColor Yellow
+    try {
+        Dism /Online /Cleanup-Image /RestoreHealth
+        Write-Host "DISM finalizado." -ForegroundColor Green
+    } catch {
+        Log-Error "Error al ejecutar DISM: $_"
+    }
+}
+
+function Revisar-EspacioDisco {
+    Write-Host ""
+    Write-Host "============================="
+    Write-Host "Revisando espacio en disco..." -ForegroundColor Yellow
+    Get-PSDrive -PSProvider FileSystem | ForEach-Object {
+        Write-Host "Disco $($_.Name): $([math]::Round($_.Used/1GB,2)) GB usados de $([math]::Round(($_.Used + $_.Free)/1GB,2)) GB." -ForegroundColor Green
+    }
+}
+
+function Optimizar-Red {
+    Write-Host ""
+    Write-Host "============================="
+    Write-Host "Optimizando red..." -ForegroundColor Yellow
+    $regPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings"
+    try {
+        Set-ItemProperty -Path $regPath -Name "MaxConnectionsPerServer" -Value 10
+        Set-ItemProperty -Path $regPath -Name "MaxConnectionsPer1_0Server" -Value 10
+        Write-Host "Red optimizada." -ForegroundColor Green
+    } catch {
+        Log-Error "Error al optimizar la red: $_"
+    }
+}
+
+function Optimizar-Adobe {
+    Write-Host ""
+    Write-Host "============================="
+    Write-Host "Optimizando programas de Adobe..." -ForegroundColor Yellow
+    $confirm = Read-Host "¿Deseas cerrar los programas de Adobe para limpiar la caché? (s/n)"
+    if ($confirm -eq 's') {
+        $apps = @("Photoshop", "Illustrator", "InDesign")
+        foreach ($app in $apps) {
+            $proceso = Get-Process -Name $app -ErrorAction SilentlyContinue
+            if ($proceso) {
+                Stop-Process -Name $app -Force
+            }
+        }
+        $adobeCachePath = "$env:APPDATA\Adobe"
+        if (Test-Path $adobeCachePath) {
+            try {
+                Remove-Item "$adobeCachePath\*" -Recurse -Force -ErrorAction SilentlyContinue
+                Write-Host "Caché de Adobe limpiada." -ForegroundColor Green
+            } catch {
+                Log-Error "Error al limpiar caché de Adobe: $_"
+            }
+        }
+    } else {
+        Write-Host "Se omitió la limpieza de caché de Adobe." -ForegroundColor Yellow
+    }
+}
+
+Verificar-Administrador
+if (-not (Verificar-Conexion)) { exit }
+
+Write-Host ""
+Write-Host "============================="
+Write-Host "=== MANTENIMIENTO DE WINDOWS PARA DISEÑADORES ===" -ForegroundColor Cyan
+Write-Host "Este proceso puede tardar entre 5 y 15 minutos." -ForegroundColor Yellow
+Write-Host "¡Comenzamos!" -ForegroundColor Green
+
+Limpiar-Temporales
+Reparar-ArchivosSistemas
+Revisar-EspacioDisco
+Optimizar-Red
+Optimizar-RAM
+Optimizar-Adobe
+
+Write-Host ""
+Write-Host "============================="
+Write-Host "Mantenimiento completado con éxito." -ForegroundColor Green
+Read-Host -Prompt "Presiona ENTER para salir"
