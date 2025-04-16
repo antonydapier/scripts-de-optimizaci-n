@@ -1,30 +1,9 @@
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName System.Drawing
-
-$form = New-Object System.Windows.Forms.Form
-$form.Text = "Mantenimiento Automático - Antony"
-$form.Size = New-Object System.Drawing.Size(400,300)
-$form.StartPosition = "CenterScreen"
-$form.TopMost = $true
-
-$label = New-Object System.Windows.Forms.Label
-$label.Text = "Iniciando mantenimiento..."
-$label.AutoSize = $true
-$label.Location = New-Object System.Drawing.Point(20,40)
-$form.Controls.Add($label)
-
-$progressBar = New-Object System.Windows.Forms.ProgressBar
-$progressBar.Location = New-Object System.Drawing.Point(20, 80)
-$progressBar.Size = New-Object System.Drawing.Size(340, 25)
-$progressBar.Style = 'Marquee'
-$form.Controls.Add($progressBar)
-
-$form.Show()
-
-Start-Sleep -Milliseconds 1000
-
 Write-Host "nIniciando el mantenimiento de la PC..." -ForegroundColor Cyan
 Write-Host "Una mente clara empieza por una máquina limpia." -ForegroundColor Magenta
+
+# ==============================
+# FUNCIONES
+# ==============================
 
 function Verificar-Administrador {
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
@@ -140,6 +119,10 @@ function Optimizar-Red {
     }
 }
 
+# ==============================
+# EJECUCIÓN DEL MANTENIMIENTO
+# ==============================
+
 Verificar-Administrador
 if (-not (Verificar-Conexion)) { exit }
 
@@ -156,14 +139,13 @@ Optimizar-RAM
 
 Write-Host "nMantenimiento finalizado correctamente." -ForegroundColor Green
 
-$label.Text = "Mantenimiento finalizado. Reiniciando en 20 segundos..."
-$progressBar.Style = 'Blocks'
-$progressBar.Value = 100
+# ==============================
+# REINICIO AUTOMÁTICO EN 10 SEGUNDOS
+# ==============================
 
-for ($i = 10; $i -ge 1; $i--) {
-    $label.Text = "Reiniciando en $i segundos..."
+for ($i = 20; $i -ge 1; $i--) {
+    Write-Host "Reiniciando en $i segundos..." -ForegroundColor Cyan
     Start-Sleep -Seconds 1
 }
 
-$form.Close()
 Restart-Computer
