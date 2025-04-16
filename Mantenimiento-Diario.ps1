@@ -26,10 +26,10 @@ $progressBar.Size = New-Object System.Drawing.Size(400, 25)
 $progressBar.Style = 'Continuous'
 $form.Controls.Add($progressBar)
 
-# Ocultar la ventana de PowerShell
+# Ocultar la ventana de PowerShell (ahora realmente se oculta)
 $console = Get-Host
-$console.UI.RawUI.WindowTitle = "Mantenimiento Automático"
 $console.UI.RawUI.WindowSize = New-Object System.Management.Automation.Host.Size(1, 1)
+$console.UI.RawUI.WindowTitle = "Mantenimiento Automático"
 
 # Función para actualizar el progreso
 function Update-Progress {
