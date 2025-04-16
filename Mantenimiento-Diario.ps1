@@ -3,21 +3,38 @@ Add-Type -AssemblyName System.Drawing
 
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "Mantenimiento Automático - Antony"
-$form.Size = New-Object System.Drawing.Size(400,300)
+$form.Size = New-Object System.Drawing.Size(450,350)
 $form.StartPosition = "CenterScreen"
 $form.TopMost = $true
+$form.FormBorderStyle = 'FixedDialog'
+$form.BackColor = [System.Drawing.Color]::FromArgb(45, 45, 48)
 
 $label = New-Object System.Windows.Forms.Label
 $label.Text = "Iniciando mantenimiento..."
+$label.ForeColor = [System.Drawing.Color]::White
+$label.Font = New-Object System.Drawing.Font("Arial", 12, [System.Drawing.FontStyle]::Bold)
 $label.AutoSize = $true
 $label.Location = New-Object System.Drawing.Point(20,40)
 $form.Controls.Add($label)
 
 $progressBar = New-Object System.Windows.Forms.ProgressBar
-$progressBar.Location = New-Object System.Drawing.Point(20, 80)
-$progressBar.Size = New-Object System.Drawing.Size(340, 25)
+$progressBar.Location = New-Object System.Drawing.Point(20, 100)
+$progressBar.Size = New-Object System.Drawing.Size(400, 25)
 $progressBar.Style = 'Marquee'
+$progressBar.ForeColor = [System.Drawing.Color]::Green
 $form.Controls.Add($progressBar)
+
+$buttonClose = New-Object System.Windows.Forms.Button
+$buttonClose.Text = "Cerrar"
+$buttonClose.Location = New-Object System.Drawing.Point(370, 250)
+$buttonClose.Size = New-Object System.Drawing.Size(60,30)
+$buttonClose.BackColor = [System.Drawing.Color]::FromArgb(70, 130, 180)
+$buttonClose.ForeColor = [System.Drawing.Color]::White
+$buttonClose.Font = New-Object System.Drawing.Font("Arial", 10)
+$buttonClose.Add_Click({
+    $form.Close()
+})
+$form.Controls.Add($buttonClose)
 
 $form.Show()
 
@@ -51,7 +68,7 @@ function Log-Error {
 }
 
 function Limpiar-Temporales {
-    Write-Host "`nEliminando archivos temporales..." -ForegroundColor Yellow
+    $label.Text = "Eliminando archivos temporales..."
     $paths = @("$env:LOCALAPPDATA\Temp", "C:\\Windows\\Temp", "$env:TEMP")
     foreach ($path in $paths) {
         if (Test-Path $path) {
@@ -75,7 +92,7 @@ function Limpiar-Temporales {
 }
 
 function Limpiar-Papelera {
-    Write-Host "`nVaciando la Papelera de reciclaje..." -ForegroundColor Yellow
+    $label.Text = "Vaciando la Papelera de reciclaje..."
     try {
         $shell = New-Object -ComObject Shell.Application
         $recycleBin = $shell.Namespace(0xA)
@@ -101,7 +118,7 @@ function Limpiar-Papelera {
 }
 
 function Optimizar-RAM {
-    Write-Host "`nLiberando RAM..." -ForegroundColor Yellow
+    $label.Text = "Liberando RAM..."
     try {
         [System.GC]::Collect()
         Write-Host "RAM liberada." -ForegroundColor Green
@@ -111,7 +128,7 @@ function Optimizar-RAM {
 }
 
 function Reparar-ArchivosSistemas {
-    Write-Host "`nEjecutando reparación de archivos SFC y DISM..." -ForegroundColor Yellow
+    $label.Text = "Ejecutando reparación de archivos SFC y DISM..."
     try {
         sfc /scannow
         Dism /Online /Cleanup-Image /RestoreHealth
@@ -122,14 +139,14 @@ function Reparar-ArchivosSistemas {
 }
 
 function Revisar-EspacioDisco {
-    Write-Host "`nEspacio en disco disponible:" -ForegroundColor Yellow
+    $label.Text = "Revisando espacio en disco..."
     Get-PSDrive -PSProvider FileSystem | ForEach-Object {
         Write-Host "Unidad ${($_.Name)}: $([math]::Round($_.Free/1GB,2)) GB libres de $([math]::Round($_.Used/1GB + $_.Free/1GB,2)) GB" -ForegroundColor Green
     }
 }
 
 function Optimizar-Red {
-    Write-Host "`nOptimizando red (sin tocar configuraciones críticas)..." -ForegroundColor Yellow
+    $label.Text = "Optimizando red..."
     try {
         $regPath = "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Internet Settings"
         Set-ItemProperty -Path $regPath -Name "MaxConnectionsPerServer" -Value 10
@@ -143,6 +160,7 @@ function Optimizar-Red {
 Verificar-Administrador
 if (-not (Verificar-Conexion)) { exit }
 
+$label.Text = "Mantenimiento iniciado..."
 Write-Host "`n============================="
 Write-Host "=== MANTENIMIENTO INICIADO ===" -ForegroundColor Cyan
 Write-Host "Este proceso puede tardar entre 5 y 15 minutos..." -ForegroundColor Yellow
@@ -153,8 +171,6 @@ Reparar-ArchivosSistemas
 Revisar-EspacioDisco
 Optimizar-Red
 Optimizar-RAM
-
-Write-Host "`nMantenimiento finalizado correctamente." -ForegroundColor Green
 
 $label.Text = "Mantenimiento finalizado. Reiniciando en 10 segundos..."
 $progressBar.Style = 'Blocks'
