@@ -26,10 +26,11 @@ $progressBar.Size = New-Object System.Drawing.Size(400, 25)
 $progressBar.Style = 'Continuous'
 $form.Controls.Add($progressBar)
 
-# Ocultar la ventana de PowerShell (ahora realmente se oculta)
+# Minimizar PowerShell, pero dejarlo visible
 $console = Get-Host
 $console.UI.RawUI.WindowSize = New-Object System.Management.Automation.Host.Size(1, 1)
 $console.UI.RawUI.WindowTitle = "Mantenimiento Automático"
+Start-Process "powershell" -ArgumentList "-Command" "Start-Sleep -Seconds 1" -WindowStyle Minimized
 
 # Función para actualizar el progreso
 function Update-Progress {
@@ -47,16 +48,27 @@ function Verificar-Administrador {
     }
 }
 
+# Función para verificar si hay programas abiertos y si se guardan
+function Verificar-ProgramasAbiertos {
+    Update-Progress "Verificando programas abiertos..." 10
+    $programasAbiertos = Get-Process | Where-Object { $_.MainWindowTitle -ne "" }
+
+    if ($programasAbiertos.Count -gt 0) {
+        $warning = "Hay programas abiertos. Asegúrese de guardar su trabajo. El sistema se reiniciará."
+        [System.Windows.Forms.MessageBox]::Show($warning, "¡Advertencia!", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
+    }
+}
+
 # Función para limpiar archivos temporales
 function Limpiar-Temporales {
-    Update-Progress "Limpiando archivos temporales..." 20
+    Update-Progress "Limpiando archivos temporales..." 30
     $paths = @("$env:LOCALAPPDATA\Temp", "C:\\Windows\\Temp", "$env:TEMP")
     foreach ($path in $paths) {
         if (Test-Path $path) {
             Remove-Item "$path\*" -Recurse -Force -ErrorAction SilentlyContinue
         }
     }
-    Update-Progress "Limpiando Descargas..." 40
+    Update-Progress "Limpiando Descargas..." 50
     Remove-Item "$env:USERPROFILE\Downloads\*" -Recurse -Force -ErrorAction SilentlyContinue
 }
 
@@ -96,6 +108,7 @@ function Optimizar-Red {
 
 # Ejecutar todas las funciones
 Verificar-Administrador
+Verificar-ProgramasAbiertos
 Limpiar-Temporales
 Limpiar-Papelera
 Optimizar-RAM
