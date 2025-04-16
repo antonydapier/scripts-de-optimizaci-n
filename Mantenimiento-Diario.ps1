@@ -1,5 +1,5 @@
-Write-Host "`Iniciando el mantenimiento de la PC..." -ForegroundColor Cyan
-Write-Host "Una mente clara empieza por una maquina limpia." -ForegroundColor Magenta
+Write-Host "`nIniciando el mantenimiento de la PC..." -ForegroundColor Cyan
+Write-Host "Una mente clara empieza por una máquina limpia." -ForegroundColor Magenta
 
 # ==============================
 # FUNCIONES
@@ -14,9 +14,9 @@ function Verificar-Administrador {
 }
 
 function Verificar-Conexion {
-    Write-Host "Verificando conexion a Internet..." -ForegroundColor Yellow
+    Write-Host "Verificando conexión a Internet..." -ForegroundColor Yellow
     if (-not (Test-Connection -ComputerName 1.1.1.1 -Count 1 -Quiet)) {
-        Write-Host "No hay conexion. Algunas funciones pueden fallar." -ForegroundColor Red
+        Write-Host "No hay conexión. Algunas funciones pueden fallar." -ForegroundColor Red
         return $false
     }
     return $true
@@ -119,25 +119,6 @@ function Optimizar-Red {
     }
 }
 
-function Optimizar-Adobe {
-    Write-Host "`nOptimizando Adobe (Photoshop, Illustrator, etc)..." -ForegroundColor Yellow
-    $confirm = Read-Host "¿Cerrar programas Adobe para limpiar cache? (s/n)"
-    if ($confirm -eq 's') {
-        $apps = @("Photoshop", "Illustrator", "InDesign", "AfterFX")
-        foreach ($app in $apps) {
-            Stop-Process -Name $app -Force -ErrorAction SilentlyContinue
-        }
-        try {
-            Remove-Item "$env:APPDATA\Adobe\*" -Recurse -Force -ErrorAction SilentlyContinue
-            Write-Host "Cache de Adobe eliminada." -ForegroundColor Green
-        } catch {
-            Log-Error "Error al limpiar Adobe: $_"
-        }
-    } else {
-        Write-Host "Se omitió limpieza de Adobe." -ForegroundColor Yellow
-    }
-}
-
 # ==============================
 # EJECUCIÓN DEL MANTENIMIENTO
 # ==============================
@@ -155,39 +136,16 @@ Reparar-ArchivosSistemas
 Revisar-EspacioDisco
 Optimizar-Red
 Optimizar-RAM
-Optimizar-Adobe
 
 Write-Host "`nMantenimiento finalizado correctamente." -ForegroundColor Green
 
 # ==============================
-# PROGRAMAR EJECUCIÓN AUTOMÁTICA
+# REINICIO AUTOMÁTICO EN 10 SEGUNDOS
 # ==============================
 
-$programar = Read-Host "¿Deseas programar este mantenimiento para cada lunes? (s/n)"
-if ($programar -eq 's') {
-    try {
-        $hora = Read-Host "¿A qué hora quieres programarlo? (ej. 09:00)"
-        $scriptPath = $MyInvocation.MyCommand.Path
-        $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File `\"$scriptPath`\"" 
-        $trigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday -At (Get-Date "01/01/2000 $hora")
-        Register-ScheduledTask -Action $action -Trigger $trigger -TaskName "MantenimientoPC" -Description "Mantenimiento semanal" -Force
-        Write-Host "Script programado para cada lunes a las $hora." -ForegroundColor Green
-    } catch {
-        Log-Error "Error al programar la tarea: $_"
-    }
+for ($i = 10; $i -ge 1; $i--) {
+    Write-Host "Reiniciando en $i segundos..." -ForegroundColor Cyan
+    Start-Sleep -Seconds 1
 }
 
-# ==============================
-# OPCIÓN DE REINICIO
-# ==============================
-
-$reiniciar = Read-Host "¿Deseas reiniciar el sistema ahora? (s/n)"
-if ($reiniciar -eq 's') {
-    Write-Host "Reiniciando..." -ForegroundColor Cyan
-    Restart-Computer
-} else {
-    Write-Host "Sin reinicio. ¡Listo para seguir diseñando!" -ForegroundColor Green
-}
-
-Read-Host -Prompt "Presiona ENTER para cerrar"
-exit
+Restart-Computer
