@@ -16,14 +16,14 @@ $form.Controls.Add($label)
 $progressBar = New-Object System.Windows.Forms.ProgressBar
 $progressBar.Location = New-Object System.Drawing.Point(20, 80)
 $progressBar.Size = New-Object System.Drawing.Size(340, 25)
-$progressBar.Style = 'Continuous'
+$progressBar.Style = 'Marquee'
 $form.Controls.Add($progressBar)
 
 $form.Show()
 
 Start-Sleep -Milliseconds 1000
 
-Write-Host "Iniciando el mantenimiento de la PC..." -ForegroundColor Cyan
+Write-Host "nIniciando el mantenimiento de la PC..." -ForegroundColor Cyan
 Write-Host "Una mente clara empieza por una máquina limpia." -ForegroundColor Magenta
 
 function Verificar-Administrador {
@@ -51,15 +51,13 @@ function Log-Error {
 }
 
 function Limpiar-Temporales {
-    Write-Host "Eliminando archivos temporales..." -ForegroundColor Yellow
+    Write-Host "nEliminando archivos temporales..." -ForegroundColor Yellow
     $paths = @("$env:LOCALAPPDATA\Temp", "C:\\Windows\\Temp", "$env:TEMP")
     foreach ($path in $paths) {
         if (Test-Path $path) {
             try {
                 Remove-Item "$path\*" -Recurse -Force -ErrorAction SilentlyContinue
-                $progressBar.Value = 20
-                $label.Text = "Limpiando: $path"
-                Start-Sleep -Milliseconds 500
+                Write-Host "Limpiado: ${path}" -ForegroundColor Green
             } catch {
                 Log-Error "Error al limpiar ${path}: $_"
             }
@@ -68,9 +66,7 @@ function Limpiar-Temporales {
 
     try {
         Remove-Item "$env:USERPROFILE\Downloads\*" -Recurse -Force -ErrorAction SilentlyContinue
-        $progressBar.Value = 40
-        $label.Text = "Limpiando: Descargas"
-        Start-Sleep -Milliseconds 500
+        Write-Host "Descargas limpiadas." -ForegroundColor Green
     } catch {
         Log-Error "Error al limpiar Descargas: $_"
     }
@@ -79,7 +75,7 @@ function Limpiar-Temporales {
 }
 
 function Limpiar-Papelera {
-    Write-Host "Vaciando la Papelera de reciclaje..." -ForegroundColor Yellow
+    Write-Host "nVaciando la Papelera de reciclaje..." -ForegroundColor Yellow
     try {
         $shell = New-Object -ComObject Shell.Application
         $recycleBin = $shell.Namespace(0xA)
@@ -98,51 +94,47 @@ function Limpiar-Papelera {
         }
 
         Start-Sleep -Seconds 2
-        $progressBar.Value = 60
-        $label.Text = "Papelera vaciada"
+        Write-Host "Papelera vaciada correctamente." -ForegroundColor Green
     } catch {
         Log-Error "Error al vaciar la papelera: $_"
     }
 }
 
 function Optimizar-RAM {
-    Write-Host "Liberando RAM..." -ForegroundColor Yellow
+    Write-Host "nLiberando RAM..." -ForegroundColor Yellow
     try {
         [System.GC]::Collect()
-        $progressBar.Value = 70
-        $label.Text = "RAM liberada"
+        Write-Host "RAM liberada." -ForegroundColor Green
     } catch {
         Log-Error "Error al liberar RAM: $_"
     }
 }
 
 function Reparar-ArchivosSistemas {
-    Write-Host "Ejecutando reparación de archivos SFC y DISM..." -ForegroundColor Yellow
+    Write-Host "nEjecutando reparación de archivos SFC y DISM..." -ForegroundColor Yellow
     try {
         sfc /scannow
         Dism /Online /Cleanup-Image /RestoreHealth
-        $progressBar.Value = 80
-        $label.Text = "Sistema reparado"
+        Write-Host "Sistema reparado." -ForegroundColor Green
     } catch {
         Log-Error "Error al ejecutar SFC/DISM: $_"
     }
 }
 
 function Revisar-EspacioDisco {
-    Write-Host "Espacio en disco disponible:" -ForegroundColor Yellow
+    Write-Host "nEspacio en disco disponible:" -ForegroundColor Yellow
     Get-PSDrive -PSProvider FileSystem | ForEach-Object {
         Write-Host "Unidad ${($_.Name)}: $([math]::Round($_.Free/1GB,2)) GB libres de $([math]::Round($_.Used/1GB + $_.Free/1GB,2)) GB" -ForegroundColor Green
     }
 }
 
 function Optimizar-Red {
-    Write-Host "Optimizando red (sin tocar configuraciones críticas)..." -ForegroundColor Yellow
+    Write-Host "nOptimizando red (sin tocar configuraciones críticas)..." -ForegroundColor Yellow
     try {
         $regPath = "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Internet Settings"
         Set-ItemProperty -Path $regPath -Name "MaxConnectionsPerServer" -Value 10
         Set-ItemProperty -Path $regPath -Name "MaxConnectionsPer1_0Server" -Value 10
-        $progressBar.Value = 90
-        $label.Text = "Red optimizada"
+        Write-Host "Red optimizada." -ForegroundColor Green
     } catch {
         Log-Error "Error al optimizar red: $_"
     }
@@ -151,7 +143,7 @@ function Optimizar-Red {
 Verificar-Administrador
 if (-not (Verificar-Conexion)) { exit }
 
-Write-Host "============================="
+Write-Host "n============================="
 Write-Host "=== MANTENIMIENTO INICIADO ===" -ForegroundColor Cyan
 Write-Host "Este proceso puede tardar entre 5 y 15 minutos..." -ForegroundColor Yellow
 Write-Host "¡Comenzamos, Antony!" -ForegroundColor Green
@@ -162,9 +154,9 @@ Revisar-EspacioDisco
 Optimizar-Red
 Optimizar-RAM
 
-Write-Host "Mantenimiento finalizado correctamente." -ForegroundColor Green
+Write-Host "nMantenimiento finalizado correctamente." -ForegroundColor Green
 
-$label.Text = "Mantenimiento finalizado. Reiniciando en 10 segundos..."
+$label.Text = "Mantenimiento finalizado. Reiniciando en 20 segundos..."
 $progressBar.Style = 'Blocks'
 $progressBar.Value = 100
 
