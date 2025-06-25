@@ -58,21 +58,21 @@ function Limpiar-Papelera {
     try {
         $shell = New-Object -ComObject Shell.Application
         $recycleBin = $shell.Namespace(0xA)
-
         $items = $recycleBin.Items()
+
         if ($items.Count -eq 0) {
             Write-Host "La Papelera ya está vacía." -ForegroundColor Gray
             return
         }
 
-        $idioma = (Get-Culture).TwoLetterISOLanguageName
-        $comando = if ($idioma -eq 'en') { 'delete' } else { 'eliminar' }
-
-        $items | ForEach-Object {
-            $_.InvokeVerb($comando)
+        for ($i = $items.Count - 1; $i -ge 0; $i--) {
+            try {
+                Remove-Item -Path $items.Item($i).Path -Recurse -Force -ErrorAction SilentlyContinue
+            } catch {
+                # Ignorar errores individuales
+            }
         }
 
-        Start-Sleep -Seconds 2
         Write-Host "Papelera vaciada correctamente." -ForegroundColor Green
     } catch {
         Log-Error "Error al vaciar la papelera: $_"
