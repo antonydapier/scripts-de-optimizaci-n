@@ -1,7 +1,6 @@
 # ================================================================
 # Script de Mantenimiento y Optimización de Windows
 # Autor: Antony Dapier
-# Propósito: Mantener la PC rápida, limpia y sin procesos innecesarios
 # ================================================================
 
 Write-Host "`nIniciando el mantenimiento de la PC..." -ForegroundColor Cyan
@@ -48,7 +47,7 @@ function Limpiar-Temporales {
                 Remove-Item "$path\*" -Recurse -Force -ErrorAction SilentlyContinue
                 Write-Host "Limpiado: ${path}" -ForegroundColor Green
             } catch {
-                Log-Error "Error al limpiar ${path}: $_"
+                Log-Error "Error al limpiar ${path}: ${_}"
             }
         }
     }
@@ -57,7 +56,7 @@ function Limpiar-Temporales {
         Remove-Item "$env:USERPROFILE\Downloads\*" -Recurse -Force -ErrorAction SilentlyContinue
         Write-Host "Descargas limpiadas." -ForegroundColor Green
     } catch {
-        Log-Error "Error al limpiar Descargas: $_"
+        Log-Error "Error al limpiar Descargas: ${_}"
     }
 
     Limpiar-Papelera
@@ -83,7 +82,7 @@ function Limpiar-Papelera {
 
         Write-Host "Papelera vaciada correctamente." -ForegroundColor Green
     } catch {
-        Log-Error "Error al vaciar la papelera: $_"
+        Log-Error "Error al vaciar la papelera: ${_}"
     }
 }
 
@@ -97,7 +96,7 @@ function Optimizar-RAM {
         [System.GC]::Collect()
         Write-Host "RAM liberada." -ForegroundColor Green
     } catch {
-        Log-Error "Error al liberar RAM: $_"
+        Log-Error "Error al liberar RAM: ${_}"
     }
 }
 
@@ -108,7 +107,7 @@ function Reparar-ArchivosSistemas {
         Dism /Online /Cleanup-Image /RestoreHealth
         Write-Host "Sistema reparado." -ForegroundColor Green
     } catch {
-        Log-Error "Error al ejecutar SFC/DISM: $_"
+        Log-Error "Error al ejecutar SFC/DISM: ${_}"
     }
 }
 
@@ -127,7 +126,7 @@ function Optimizar-Red {
         Set-ItemProperty -Path $regPath -Name "MaxConnectionsPer1_0Server" -Value 10
         Write-Host "Red optimizada." -ForegroundColor Green
     } catch {
-        Log-Error "Error al optimizar red: $_"
+        Log-Error "Error al optimizar red: ${_}"
     }
 }
 
@@ -149,7 +148,7 @@ function Eliminar-Telemetria {
             Set-Service -Name $s -StartupType Disabled
             Write-Host "Desactivado servicio: $s" -ForegroundColor Gray
         } catch {
-            Log-Error "Error al desactivar servicio $s: $_"
+            Log-Error "Error al desactivar servicio ${s}: ${_}"
         }
     }
 
@@ -172,7 +171,7 @@ function Eliminar-Telemetria {
             Disable-ScheduledTask -TaskPath $t -ErrorAction SilentlyContinue
             Write-Host "Tarea desactivada: $t" -ForegroundColor DarkGray
         } catch {
-            Log-Error "Error al desactivar tarea $t: $_"
+            Log-Error "Error al desactivar tarea ${t}: ${_}"
         }
     }
 
@@ -181,7 +180,7 @@ function Eliminar-Telemetria {
         Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection" -Name "AllowTelemetry" -Value 0
         Write-Host "Telemetría bloqueada desde el registro." -ForegroundColor Green
     } catch {
-        Log-Error "Error al modificar el registro de telemetría: $_"
+        Log-Error "Error al modificar el registro de telemetría: ${_}"
     }
 
     Write-Host "Procesos de telemetría eliminados con éxito." -ForegroundColor Green
