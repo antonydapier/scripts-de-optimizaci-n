@@ -1,11 +1,11 @@
 # ================================================================
 # Script de Mantenimiento y Optimización de Windows
 # Autor: Antony Dapier
-# Versión: 1.5
+# Versión: 5.1
 # ================================================================
 
 [CmdletBinding(SupportsShouldProcess=$true)]
-param(
+param (
     # Incluir la carpeta de Descargas en el proceso de limpieza. ¡USAR CON PRECAUCIÓN!
     [switch]$LimpiarDescargas,
 
@@ -17,8 +17,8 @@ param(
 
     # Aplica ajustes visuales para máximo rendimiento, desactivando animaciones y transparencias.
     [switch]$AjustesVisuales,
-
-    # Forzar el reinicio del equipo automáticamente al finalizar el script.
+    
+    # Fuerza el reinicio automático al finalizar sin preguntar.
     [switch]$ForzarReinicio
 )
 
@@ -43,7 +43,6 @@ function Confirm-IsAdmin {
         if ($QuitarBloatware.IsPresent) { $params += "-QuitarBloatware" }
         if ($AjustesVisuales.IsPresent) { $params += "-AjustesVisuales" }
         if ($RepararSistema.IsPresent) { $params += "-RepararSistema" }
-        if ($ForzarReinicio.IsPresent) { $params += "-ForzarReinicio" }
         Start-Process powershell -ArgumentList $params -Verb RunAs
         exit
     }
@@ -108,6 +107,16 @@ function Get-DiskSpace {
     }
 }
 
+function Flush-DnsCache {
+    Write-Host "`nLimpiando la caché de resolución de DNS..." -ForegroundColor Yellow
+    try {
+        ipconfig /flushdns | Out-Null
+        Write-Host "Caché de DNS limpiada." -ForegroundColor Green
+    } catch {
+        Log-Error ("Error al limpiar la caché de DNS: " + $_.Exception.Message)
+    }
+}
+
 function Set-NetworkOptimization {
     Write-Host "`nOptimizando red..." -ForegroundColor Yellow
     try {
@@ -118,15 +127,6 @@ function Set-NetworkOptimization {
     } catch {
         Log-Error ("Error al optimizar red: " + $_.Exception.Message)
     }
-}
-
-function Set-UltimatePerformancePlan {
-    Write-Host "`nConfigurando plan de energía para 'Máximo Rendimiento'..." -ForegroundColor Yellow
-    $ultimatePlanGuid = "e9a42b02-d5df-448d-aa00-03f14749eb61"
-    # Se suprime la salida de este comando para evitar el mensaje "No se admite" si el plan ya existe.
-    powercfg -duplicatescheme $ultimatePlanGuid | Out-Null
-    powercfg -setactive $ultimatePlanGuid
-    Write-Host "Plan de energía 'Máximo Rendimiento' activado." -ForegroundColor Green
 }
 
 function Disable-VisualEffects {
@@ -175,10 +175,10 @@ function Disable-GamingFeatures {
     }
 }
 
-function Disable-Telemetry {
-    Write-Host "`nDeshabilitando servicios y tareas de telemetría..." -ForegroundColor Yellow
-    $serviciosTelemetria = @( "DiagTrack", "dmwappushsvc", "WMPNetworkSvc", "RemoteRegistry", "RetailDemo", "diagnosticshub.standardcollector.service" )
-    foreach ($s in $serviciosTelemetria) {
+function Optimize-BackgroundProcesses {
+    Write-Host "`nOptimizando procesos de fondo (Telemetría, etc.)..." -ForegroundColor Yellow
+    $serviciosADeshabilitar = @( "DiagTrack", "dmwappushsvc", "WMPNetworkSvc", "RemoteRegistry", "RetailDemo", "diagnosticshub.standardcollector.service", "MapsBroker", "Fax" )
+    foreach ($s in $serviciosADeshabilitar) {
         $servicio = Get-Service -Name $s -ErrorAction SilentlyContinue
         if ($null -ne $servicio -and $servicio.Status -ne 'Stopped') {
             try {
@@ -231,7 +231,7 @@ function Optimize-Drives {
     try {
         Get-Volume | Where-Object { $_.DriveType -eq 'Fixed' -and $_.FileSystem -ne 'RAW' } | ForEach-Object {
             Write-Host "Optimizando unidad $($_.DriveLetter):..." -ForegroundColor Gray
-            Optimize-Volume -DriveLetter $_.DriveLetter -Verbose
+            Optimize-Volume -DriveLetter $_.DriveLetter
         }
         Write-Host "Optimización de unidades completada." -ForegroundColor Green
     } catch {
@@ -245,10 +245,9 @@ function Show-ExecutionPlan {
     Write-Host "-------------------------------------"
     
     Write-Host "[TAREAS ESTÁNDAR]" -ForegroundColor Yellow
-    Write-Host " - Configurar plan de 'Máximo Rendimiento'"
     Write-Host " - Desactivar características de juego (Xbox)"
-    Write-Host " - Optimizar configuración de red"
-    Write-Host " - Deshabilitar telemetría de Windows"
+    Write-Host " - Optimizar configuración de red y limpiar caché DNS"
+    Write-Host " - Optimizar procesos de fondo (Telemetría, etc.)"
     Write-Host " - Limpieza de archivos temporales y Papelera"
     Write-Host " - Optimización de unidades de disco (Defrag/TRIM)"
     Write-Host " - Revisión del espacio en disco"
@@ -264,6 +263,34 @@ function Show-ExecutionPlan {
     Write-Host "-------------------------------------"
 }
 
+function Handle-SmartRestart {
+    $respuesta = "n"
+    if (-not $ForzarReinicio.IsPresent) {
+        Write-Host "`n"
+        $respuesta = Read-Host -Prompt "El mantenimiento ha finalizado. ¿Deseas reiniciar ahora para aplicar todos los cambios? (s/n)"
+    }
+
+    if ($ForzarReinicio.IsPresent -or $respuesta -eq 's') {
+        Write-Host "`n========================================" -ForegroundColor Yellow
+        Write-Host "REINICIO PROGRAMADO" -ForegroundColor Yellow
+        Write-Host "========================================" -ForegroundColor Yellow
+        Write-Host "El equipo se reiniciará para aplicar todos los cambios." -ForegroundColor Green
+        
+        try {
+            for ($i = 10; $i -ge 1; $i--) {
+                Write-Host -NoNewline "`rReiniciando en $i segundos... Presiona CTRL+C para cancelar. "
+                Start-Sleep -Seconds 1
+            }
+            Write-Host "`n¡Reiniciando ahora!" -ForegroundColor Green
+            Shutdown.exe /r /f /t 0
+        } catch {
+            Write-Host "`nReinicio cancelado por el usuario." -ForegroundColor Red
+        }
+    } else {
+        Write-Host "`nReinicio omitido. Recuerda reiniciar manualmente para aplicar todos los cambios." -ForegroundColor Cyan
+    }
+}
+
 # ==============================
 # EJECUCIÓN PRINCIPAL
 # ==============================
@@ -271,23 +298,20 @@ function Show-ExecutionPlan {
 Confirm-IsAdmin
 if (-not (Test-InternetConnection)) { Stop-Transcript; exit }
 
-# Mostrar el plan de ejecución al inicio para que el informe sea coherente.
 Show-ExecutionPlan
 
 Write-Host "`n============================="
 Write-Host "=== MANTENIMIENTO INICIADO ===" -ForegroundColor Cyan
 
-# Tareas estándar
-Set-UltimatePerformancePlan
 Disable-GamingFeatures
 Set-NetworkOptimization
-Disable-Telemetry
+Flush-DnsCache
+Optimize-BackgroundProcesses
 Clear-TemporaryFiles
 Clear-RecycleBinAllDrives
 Optimize-Drives
 Get-DiskSpace
 
-# Tareas opcionales
 if ($QuitarBloatware.IsPresent) { Remove-Bloatware }
 if ($AjustesVisuales.IsPresent) { Disable-VisualEffects }
 if ($RepararSistema.IsPresent) { Repair-SystemFiles }
@@ -295,24 +319,8 @@ if ($RepararSistema.IsPresent) { Repair-SystemFiles }
 Write-Host "`n============================="
 Write-Host "MANTENIMIENTO FINALIZADO CORRECTAMENTE." -ForegroundColor Green
 
-# --- FINALIZACIÓN Y REINICIO ---
+# Detener la transcripción ANTES de preguntar por el reinicio.
 Stop-Transcript
 Write-Host "`nUn informe detallado de esta sesión se ha guardado en: $informePath" -ForegroundColor Cyan
 
-if ($ForzarReinicio.IsPresent) {
-    Write-Host "`nATENCIÓN: El sistema se reiniciará en 20 segundos (parámetro -ForzarReinicio detectado)." -ForegroundColor Yellow
-    Start-Sleep -Seconds 20
-    Restart-Computer -Force
-} else {
-    try {
-        $respuesta = Read-Host -Prompt 'Se recomienda reiniciar para aplicar todos los cambios. ¿Deseas reiniciar ahora? (S/N)'
-        if ($respuesta -match '^[sS]$') {
-            Write-Host 'Reiniciando el equipo...' -ForegroundColor Green
-            Restart-Computer
-        } else {
-            Write-Host 'Reinicio cancelado. Recuerda reiniciar manualmente más tarde.' -ForegroundColor Yellow
-        }
-    } catch {
-        Write-Host 'No se pudo leer la entrada. Por favor, reinicia manualmente.' -ForegroundColor Yellow
-    }
-}
+Handle-SmartRestart
