@@ -1,23 +1,11 @@
 # ================================================================
 # Script de Mantenimiento y Optimización de Windows
 # Autor: Antony Dapier
-# Versión: 5.1
+# Versión: 7.0
 # ================================================================
 
 [CmdletBinding(SupportsShouldProcess=$true)]
 param (
-    # Incluir la carpeta de Descargas en el proceso de limpieza. ¡USAR CON PRECAUCIÓN!
-    [switch]$LimpiarDescargas,
-
-    # Realiza la reparación profunda del sistema con SFC y DISM (tarda mucho tiempo).
-    [switch]$RepararSistema,
-
-    # Elimina aplicaciones preinstaladas de Windows (Bloatware) como Candy Crush, etc.
-    [switch]$QuitarBloatware,
-
-    # Aplica ajustes visuales para máximo rendimiento, desactivando animaciones y transparencias.
-    [switch]$AjustesVisuales,
-    
     # Fuerza el reinicio automático al finalizar sin preguntar.
     [switch]$ForzarReinicio
 )
@@ -32,72 +20,69 @@ try {
 }
 
 # ==============================
-# FUNCIONES
+# FUNCIONES DE AYUDA
 # ==============================
-
-function Confirm-IsAdmin {
-    if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
-        Write-Host "Este script necesita permisos de Administrador. Intentando elevar..." -ForegroundColor Red
-        $params = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$($MyInvocation.MyCommand.Path)`"")
-        if ($LimpiarDescargas.IsPresent) { $params += "-LimpiarDescargas" }
-        if ($QuitarBloatware.IsPresent) { $params += "-QuitarBloatware" }
-        if ($AjustesVisuales.IsPresent) { $params += "-AjustesVisuales" }
-        if ($RepararSistema.IsPresent) { $params += "-RepararSistema" }
-        Start-Process powershell -ArgumentList $params -Verb RunAs
-        exit
-    }
-}
-
-function Test-InternetConnection {
-    Write-Host "Verificando conexión a Internet..." -ForegroundColor Yellow
-    if (-not (Test-Connection -ComputerName 1.1.1.1 -Count 1 -Quiet)) {
-        Write-Host "No hay conexión. Algunas funciones pueden fallar." -ForegroundColor Red
-        return $false
-    }
-    Write-Host "Conexión a Internet verificada." -ForegroundColor Green
-    return $true
-}
 
 function Log-Error {
     param ([string]$message)
     Write-Host "ERROR: $message" -ForegroundColor Red
 }
 
+function Write-TaskStatus {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$TaskName,
+
+        [Parameter(Mandatory=$true)]
+        [scriptblock]$Action
+    )
+    Write-Host -NoNewline "  -> $TaskName..."
+    try {
+        & $Action
+        Write-Host " [OK]" -ForegroundColor Green
+    } catch {
+        Write-Host " [FALLÓ]" -ForegroundColor Red
+        Log-Error "Error en la tarea '$TaskName': $($_.Exception.Message)"
+    }
+}
+
+# ==============================
+# FUNCIONES DE TAREA (SILENCIOSAS)
+# ==============================
+
+function Confirm-IsAdmin {
+    if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+        Write-Host "Este script necesita permisos de Administrador. Intentando elevar..." -ForegroundColor Red
+        $params = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$($MyInvocation.MyCommand.Path)`"")
+        Start-Process powershell -ArgumentList $params -Verb RunAs
+        exit
+    }
+}
+
+function Test-InternetConnection {
+    if (-not (Test-Connection -ComputerName 1.1.1.1 -Count 1 -Quiet)) {
+        throw "No hay conexión a Internet."
+    }
+}
+
 function Clear-TemporaryFiles {
-    Write-Host "`nEliminando archivos temporales..." -ForegroundColor Yellow
     $paths = @("$env:LOCALAPPDATA\Temp", "C:\Windows\Temp", "$env:TEMP") | Select-Object -Unique
     foreach ($path in $paths) {
         if (Test-Path $path) {
-            try {
-                Get-ChildItem -Path $path -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-                Write-Host "Limpiado: $path" -ForegroundColor Green
-            } catch {
-                Log-Error ("Error al limpiar ${path}: " + $_.Exception.Message)
-            }
-        }
-    }
-    if ($LimpiarDescargas.IsPresent) {
-        Write-Host "`nLimpiando carpeta de Descargas (según solicitado)..." -ForegroundColor Yellow
-        $downloadsPath = "$env:USERPROFILE\Downloads"
-        if (Test-Path $downloadsPath) {
-            try {
-                Get-ChildItem -Path $downloadsPath -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-                Write-Host "Carpeta de Descargas limpiada." -ForegroundColor Green
-            } catch {
-                Log-Error ("Error al limpiar la carpeta de Descargas: " + $_.Exception.Message)
-            }
+            Get-ChildItem -Path $path -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
         }
     }
 }
 
-function Clear-RecycleBinAllDrives {
-    Write-Host "`nVaciando la Papelera de reciclaje..." -ForegroundColor Yellow
-    try {
-        Clear-RecycleBin -Force -ErrorAction SilentlyContinue
-        Write-Host "Papelera vaciada correctamente." -ForegroundColor Green
-    } catch {
-        Log-Error ("No se pudo vaciar la papelera: " + $_.Exception.Message)
+function Clear-DownloadsFolder {
+    $downloadsPath = "$env:USERPROFILE\Downloads"
+    if (Test-Path $downloadsPath) {
+        Get-ChildItem -Path $downloadsPath -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
     }
+}
+
+function Clear-RecycleBinAllDrives {
+    Clear-RecycleBin -Force -ErrorAction SilentlyContinue
 }
 
 function Get-DiskSpace {
@@ -108,159 +93,119 @@ function Get-DiskSpace {
 }
 
 function Flush-DnsCache {
-    Write-Host "`nLimpiando la caché de resolución de DNS..." -ForegroundColor Yellow
-    try {
-        ipconfig /flushdns | Out-Null
-        Write-Host "Caché de DNS limpiada." -ForegroundColor Green
-    } catch {
-        Log-Error ("Error al limpiar la caché de DNS: " + $_.Exception.Message)
-    }
+    ipconfig /flushdns | Out-Null
 }
 
 function Set-NetworkOptimization {
-    Write-Host "`nOptimizando red..." -ForegroundColor Yellow
-    try {
-        $regPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings"
-        Set-ItemProperty -Path $regPath -Name "MaxConnectionsPerServer" -Value 10 -Force
-        Set-ItemProperty -Path $regPath -Name "MaxConnectionsPer1_0Server" -Value 10 -Force
-        Write-Host "Red optimizada." -ForegroundColor Green
-    } catch {
-        Log-Error ("Error al optimizar red: " + $_.Exception.Message)
-    }
+    $regPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings"
+    Set-ItemProperty -Path $regPath -Name "MaxConnectionsPerServer" -Value 10 -Force
+    Set-ItemProperty -Path $regPath -Name "MaxConnectionsPer1_0Server" -Value 10 -Force
 }
 
 function Disable-VisualEffects {
-    Write-Host "`nDesactivando efectos visuales para mejorar la agilidad del sistema..." -ForegroundColor Yellow
-    try {
-        Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects" -Name "VisualFxSetting" -Value 2 -Force
-        Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "EnableTransparency" -Value 0 -Force
-        Write-Host "Efectos visuales desactivados." -ForegroundColor Green
-    } catch {
-        Log-Error ("Error al desactivar efectos visuales: " + $_.Exception.Message)
-    }
+    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects" -Name "VisualFxSetting" -Value 2 -Force
+    Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "EnableTransparency" -Value 0 -Force
 }
 
 function Remove-Bloatware {
-    Write-Host "`nCreando punto de restauración del sistema antes de eliminar aplicaciones..." -ForegroundColor Cyan
+    Write-Host "`n  -> Creando punto de restauración..." -NoNewline
     try {
         Checkpoint-Computer -Description "Antes de eliminar Bloatware con Script de Optimización" -ErrorAction Stop
-        Write-Host "Punto de restauración creado con éxito." -ForegroundColor Green
+        Write-Host " [OK]" -ForegroundColor Green
     } catch {
+        Write-Host " [FALLÓ]" -ForegroundColor Red
         Log-Error ("No se pudo crear el punto de restauración. Saltando eliminación de bloatware por seguridad.")
+        Write-Host "     SUGERENCIA: Asegúrate de que la 'Protección del sistema' esté activada para tu unidad C:." -ForegroundColor Cyan
         return
     }
-    Write-Host "`nEliminando aplicaciones preinstaladas (Bloatware)..." -ForegroundColor Yellow
-    $bloatware = @( "*3DBuilder*", "*3DViewer*", "*BingFinance*", "*BingNews*", "*BingSports*", "*BingWeather*", "*CandyCrush*", "*king.com*", "*EclipseManager*", "*Facebook*", "*HiddenCity*", "*Minecraft*", "*Netflix*", "*OneConnect*", "*OneNote*", "*People*", "*Photos*", "*SkypeApp*", "*SolitaireCollection*", "*Spotify*", "*Twitter*", "*Wallet*", "*YourPhone*", "*ZuneMusic*", "*ZuneVideo*", "*Xbox*", "*MixedReality.Portal*" )
+
+    Write-Host "  -> Eliminando aplicaciones preinstaladas (Bloatware)..."
+    $bloatware = @(
+        "*3DBuilder*", "*3DViewer*", "*BingFinance*", "*BingNews*", "*BingSports*", 
+        "*BingWeather*", "*CandyCrush*", "*king.com*", "*EclipseManager*", "*Facebook*",
+        "*HiddenCity*", "*Minecraft*", "*OneConnect*", "*OneNote*", 
+        "*Microsoft.People*", "*Photos*", "*SkypeApp*", "*Twitter*", 
+        "*Wallet*", "*YourPhone*", "*ZuneMusic*", "*ZuneVideo*", 
+        "*XboxApp*", "*XboxGamingOverlay*", "*XboxSpeechToTextOverlay*",
+        "*MixedReality.Portal*"
+    )
     foreach ($app in $bloatware) {
         Get-AppxPackage -AllUsers -Name $app | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue
         Get-AppxProvisionedPackage -Online | Where-Object { $_.DisplayName -like $app } | Remove-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue
-        Write-Host "Intentando eliminar (si existía): $app" -ForegroundColor Gray
     }
-    Write-Host "Limpieza de Bloatware completada." -ForegroundColor Green
+    Write-Host "     Limpieza de Bloatware completada." -ForegroundColor Green
+}
+
+function Disable-StartupApps {
+    $startupExclusions = @("security", "antivirus", "defender", "nvidia", "amd", "intel", "audio", "realtek", "synaptics", "onedrive", "dropbox")
+    $runKeys = @("HKCU:\Software\Microsoft\Windows\CurrentVersion\Run", "HKLM:\Software\Microsoft\Windows\CurrentVersion\Run")
+
+    foreach ($key in $runKeys) {
+        if (Test-Path $key) {
+            $backupKey = "${key}_DisabledByScript"
+            if (-not (Test-Path $backupKey)) { New-Item -Path $backupKey -Force | Out-Null }
+
+            $properties = Get-ItemProperty -Path $key
+            $appNames = $properties.PSObject.Properties.Name | Where-Object { $_ -notlike "PS*" -and $_ -ne "(default)" }
+
+            foreach ($appName in $appNames) {
+                if (-not ($startupExclusions | Where-Object { $appName -ilike "*$_*" -or $properties.$appName -ilike "*$_*"})) {
+                    try {
+                        Move-ItemProperty -Path $key -Destination $backupKey -Name $appName -Force -ErrorAction Stop
+                    } catch {
+                        # Silently ignore if it fails, as it's not critical
+                    }
+                }
+            }
+        }
+    }
 }
 
 function Disable-GamingFeatures {
-    Write-Host "`nDesactivando características de juego (Xbox Game Bar)..." -ForegroundColor Yellow
-    try {
-        Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\GameDVR" -Name "AppCaptureEnabled" -Value 0 -Force
-        Set-ItemProperty -Path "HKCU:\Software\Microsoft\GameBar" -Name "UseGameBarOnlyInFullscreen" -Value 0 -Force
-        Set-ItemProperty -Path "HKCU:\Software\Microsoft\GameBar" -Name "ShowStartupPanel" -Value 0 -Force
-        $xboxServices = @("XblAuthManager", "XblGameSave", "XboxGipSvc", "XboxNetApiSvc")
-        foreach ($service in $xboxServices) {
-            if (Get-Service -Name $service -ErrorAction SilentlyContinue) { Set-Service -Name $service -StartupType Disabled -ErrorAction SilentlyContinue }
-        }
-        Write-Host "Características de juego de Xbox desactivadas." -ForegroundColor Green
-    } catch {
-        Log-Error ("Error al desactivar las características de juego: " + $_.Exception.Message)
+    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\GameDVR" -Name "AppCaptureEnabled" -Value 0 -Force
+    Set-ItemProperty -Path "HKCU:\Software\Microsoft\GameBar" -Name "UseGameBarOnlyInFullscreen" -Value 0 -Force
+    Set-ItemProperty -Path "HKCU:\Software\Microsoft\GameBar" -Name "ShowStartupPanel" -Value 0 -Force
+    $xboxServices = @("XblAuthManager", "XblGameSave", "XboxGipSvc", "XboxNetApiSvc")
+    foreach ($service in $xboxServices) {
+        if (Get-Service -Name $service -ErrorAction SilentlyContinue) { Set-Service -Name $service -StartupType Disabled -ErrorAction SilentlyContinue }
     }
 }
 
 function Optimize-BackgroundProcesses {
-    Write-Host "`nOptimizando procesos de fondo (Telemetría, etc.)..." -ForegroundColor Yellow
     $serviciosADeshabilitar = @( "DiagTrack", "dmwappushsvc", "WMPNetworkSvc", "RemoteRegistry", "RetailDemo", "diagnosticshub.standardcollector.service", "MapsBroker", "Fax" )
     foreach ($s in $serviciosADeshabilitar) {
         $servicio = Get-Service -Name $s -ErrorAction SilentlyContinue
         if ($null -ne $servicio -and $servicio.Status -ne 'Stopped') {
-            try {
-                Stop-Service -Name $s -Force -ErrorAction SilentlyContinue
-                Set-Service -Name $s -StartupType Disabled -ErrorAction SilentlyContinue
-                Write-Host "Servicio deshabilitado: $s" -ForegroundColor Gray
-            } catch {
-                Log-Error ("Error al desactivar servicio ${s}: " + $_.Exception.Message)
-            }
+            Stop-Service -Name $s -Force -ErrorAction SilentlyContinue
+            Set-Service -Name $s -StartupType Disabled -ErrorAction SilentlyContinue
         }
     }
-    $tareasTelemetria = @( "\Microsoft\Windows\Application Experience\ProgramDataUpdater", "\Microsoft\Windows\Autochk\Proxy", "\Microsoft\Windows\Customer Experience Improvement Program\Consolidator", "\Microsoft\Windows\Customer Experience Improvement Program\KernelCeipTask", "\Microsoft\Windows\Customer Experience Improvement Program\UsbCeip", "\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticDataCollector", "\Microsoft\Windows\Feedback\Siuf\DmClient", "\Microsoft\Windows\Feedback\Siuf\DmClientOnScenarioDownload", "\Microsoft\Windows\Windows Error Reporting\QueueReporting" )
+    $tareasTelemetria = @( "\Microsoft\Windows\Application Experience\ProgramDataUpdater", "\Microsoft\Windows\Autochk\Proxy", "\Microsoft\Windows\Customer Experience Improvement Program\Consolidator", "\Microsoft\Windows\Customer Experience Improvement Program\KernelCeipTask", "\Microsoft\Windows\Customer Experience Improvement Program\UsbCeip", "\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticDataCollector" )
     foreach ($t in $tareasTelemetria) {
         $task = Get-ScheduledTask -TaskPath $t -ErrorAction SilentlyContinue
         if ($null -ne $task -and $task.State -ne 'Disabled') {
-            try {
-                $task | Disable-ScheduledTask
-                Write-Host "Tarea deshabilitada: $t" -ForegroundColor DarkGray
-            } catch {
-                Log-Error ("Error al desactivar tarea ${t}: " + $_.Exception.Message)
-            }
+            $task | Disable-ScheduledTask -ErrorAction SilentlyContinue
         }
     }
-    try {
-        $regPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection"
-        if (-not (Test-Path $regPath)) { New-Item -Path $regPath -Force | Out-Null }
-        Set-ItemProperty -Path $regPath -Name "AllowTelemetry" -Value 0 -Force
-        Write-Host "Telemetría bloqueada desde el registro." -ForegroundColor Green
-    } catch {
-        Log-Error ("Error al modificar el registro de telemetría: " + $_.Exception.Message)
-    }
+    $regPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection"
+    if (-not (Test-Path $regPath)) { New-Item -Path $regPath -Force | Out-Null }
+    Set-ItemProperty -Path $regPath -Name "AllowTelemetry" -Value 0 -Force
 }
 
 function Repair-SystemFiles {
-    Write-Host "`nEjecutando reparación de archivos del sistema (puede tardar varios minutos)..." -ForegroundColor Yellow
-    try {
-        Write-Host "Paso 1/2: Ejecutando 'sfc /scannow'..." -ForegroundColor Gray
-        sfc.exe /scannow | Out-Null
-        Write-Host "SFC completado." -ForegroundColor Green
-        Write-Host "Paso 2/2: Ejecutando 'Dism /Online /Cleanup-Image /RestoreHealth'..." -ForegroundColor Gray
-        Dism.exe /Online /Cleanup-Image /RestoreHealth | Out-Null
-        Write-Host "DISM completado." -ForegroundColor Green
-    } catch {
-        Log-Error ("Ocurrió un error durante la reparación del sistema (SFC/DISM): " + $_.Exception.Message)
-    }
+    Write-Progress -Activity "Reparando Sistema" -Status "Paso 1/2: Ejecutando SFC /scannow (esto puede tardar)..." -PercentComplete 0
+    Start-Process sfc.exe -ArgumentList "/scannow" -Wait -NoNewWindow
+    
+    Write-Progress -Activity "Reparando Sistema" -Status "Paso 2/2: Ejecutando DISM (esto puede tardar aún más)..." -PercentComplete 50
+    Start-Process Dism.exe -ArgumentList "/Online /Cleanup-Image /RestoreHealth" -Wait -NoNewWindow
+    
+    Write-Progress -Activity "Reparando Sistema" -Status "Completado." -Completed
 }
 
 function Optimize-Drives {
-    Write-Host "`nOptimizando unidades de disco (Defrag/TRIM)..." -ForegroundColor Yellow
-    try {
-        Get-Volume | Where-Object { $_.DriveType -eq 'Fixed' -and $_.FileSystem -ne 'RAW' } | ForEach-Object {
-            Write-Host "Optimizando unidad $($_.DriveLetter):..." -ForegroundColor Gray
-            Optimize-Volume -DriveLetter $_.DriveLetter
-        }
-        Write-Host "Optimización de unidades completada." -ForegroundColor Green
-    } catch {
-        Log-Error ("Ocurrió un error durante la optimización de unidades: " + $_.Exception.Message)
+    Get-Volume | Where-Object { $_.DriveType -eq 'Fixed' -and $_.FileSystem -ne 'RAW' } | ForEach-Object {
+        Optimize-Volume -DriveLetter $_.DriveLetter
     }
-}
-
-function Show-ExecutionPlan {
-    Write-Host "`n========= PLAN DE EJECUCIÓN =========" -ForegroundColor Cyan
-    Write-Host "Se realizarán las siguientes tareas:"
-    Write-Host "-------------------------------------"
-    
-    Write-Host "[TAREAS ESTÁNDAR]" -ForegroundColor Yellow
-    Write-Host " - Desactivar características de juego (Xbox)"
-    Write-Host " - Optimizar configuración de red y limpiar caché DNS"
-    Write-Host " - Optimizar procesos de fondo (Telemetría, etc.)"
-    Write-Host " - Limpieza de archivos temporales y Papelera"
-    Write-Host " - Optimización de unidades de disco (Defrag/TRIM)"
-    Write-Host " - Revisión del espacio en disco"
-    Write-Host ""
-
-    if ($QuitarBloatware.IsPresent -or $AjustesVisuales.IsPresent -or $RepararSistema.IsPresent -or $LimpiarDescargas.IsPresent) {
-        Write-Host "[TAREAS OPCIONALES (Activadas por parámetro)]" -ForegroundColor Yellow
-        if ($QuitarBloatware.IsPresent) { Write-Host " - Eliminar Bloatware (con punto de restauración)" -ForegroundColor Green }
-        if ($AjustesVisuales.IsPresent) { Write-Host " - Aplicar ajustes visuales para rendimiento" -ForegroundColor Green }
-        if ($RepararSistema.IsPresent) { Write-Host " - Reparación profunda del sistema (SFC/DISM)" -ForegroundColor Green }
-        if ($LimpiarDescargas.IsPresent) { Write-Host " - Limpiar carpeta de Descargas ¡CON PRECAUCIÓN!" -ForegroundColor Red }
-    }
-    Write-Host "-------------------------------------"
 }
 
 function Handle-SmartRestart {
@@ -296,28 +241,37 @@ function Handle-SmartRestart {
 # ==============================
 
 Confirm-IsAdmin
-if (-not (Test-InternetConnection)) { Stop-Transcript; exit }
 
-Show-ExecutionPlan
+Write-Host "`n==========================================" -ForegroundColor Cyan
+Write-Host "=== INICIANDO SCRIPT DE OPTIMIZACIÓN ===" -ForegroundColor Cyan
+Write-Host "=========================================="
 
-Write-Host "`n============================="
-Write-Host "=== MANTENIMIENTO INICIADO ===" -ForegroundColor Cyan
+Write-Host "`n[Paso 1: Preparación y Verificaciones]" -ForegroundColor Yellow
+Write-TaskStatus -TaskName "Verificando conexión a Internet" -Action { Test-InternetConnection }
 
-Disable-GamingFeatures
-Set-NetworkOptimization
-Flush-DnsCache
-Optimize-BackgroundProcesses
-Clear-TemporaryFiles
-Clear-RecycleBinAllDrives
-Optimize-Drives
+Write-Host "`n[Paso 2: Limpieza del Sistema]" -ForegroundColor Yellow
+Write-TaskStatus -TaskName "Limpiando archivos temporales" -Action { Clear-TemporaryFiles }
+Write-TaskStatus -TaskName "Vaciando la Papelera de Reciclaje" -Action { Clear-RecycleBinAllDrives }
+Write-TaskStatus -TaskName "Limpiando carpeta de Descargas (¡PRECAUCIÓN!)" -Action { Clear-DownloadsFolder }
+
+Write-Host "`n[Paso 3: Optimización de Rendimiento]" -ForegroundColor Yellow
+Write-TaskStatus -TaskName "Optimizando configuración de red" -Action { Set-NetworkOptimization }
+Write-TaskStatus -TaskName "Limpiando caché de DNS" -Action { Flush-DnsCache }
+Write-TaskStatus -TaskName "Deshabilitando aplicaciones de inicio" -Action { Disable-StartupApps }
+Write-TaskStatus -TaskName "Desactivando telemetría y servicios en segundo plano" -Action { Optimize-BackgroundProcesses }
+Write-TaskStatus -TaskName "Desactivando características de juego de Xbox" -Action { Disable-GamingFeatures }
+Write-TaskStatus -TaskName "Ajustando efectos visuales para rendimiento" -Action { Disable-VisualEffects }
+Write-TaskStatus -TaskName "Optimizando unidades de disco (Defrag/TRIM)" -Action { Optimize-Drives }
+
+Write-Host "`n[Paso 4: Mantenimiento Profundo]" -ForegroundColor Yellow
+Remove-Bloatware
+Write-TaskStatus -TaskName "Reparando archivos de sistema (SFC y DISM)" -Action { Repair-SystemFiles }
+
 Get-DiskSpace
 
-if ($QuitarBloatware.IsPresent) { Remove-Bloatware }
-if ($AjustesVisuales.IsPresent) { Disable-VisualEffects }
-if ($RepararSistema.IsPresent) { Repair-SystemFiles }
-
-Write-Host "`n============================="
+Write-Host "`n==========================================" -ForegroundColor Green
 Write-Host "MANTENIMIENTO FINALIZADO CORRECTAMENTE." -ForegroundColor Green
+Write-Host "=========================================="
 
 # Detener la transcripción ANTES de preguntar por el reinicio.
 Stop-Transcript
