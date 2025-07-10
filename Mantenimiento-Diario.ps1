@@ -1,7 +1,7 @@
 # ================================================================
 # Script de Mantenimiento y Optimización de Windows
 # Autor: Antony Dapier
-# Versión: 7.0
+# Versión: 7.1
 # ================================================================
 
 [CmdletBinding(SupportsShouldProcess=$true)]
@@ -36,7 +36,7 @@ function Write-TaskStatus {
         [Parameter(Mandatory=$true)]
         [scriptblock]$Action
     )
-    Write-Host -NoNewline "  -> $TaskName..."
+    Write-Host -NoNewline "  -&gt; $TaskName..."
     try {
         & $Action
         Write-Host " [OK]" -ForegroundColor Green
@@ -74,13 +74,6 @@ function Clear-TemporaryFiles {
     }
 }
 
-function Clear-DownloadsFolder {
-    $downloadsPath = "$env:USERPROFILE\Downloads"
-    if (Test-Path $downloadsPath) {
-        Get-ChildItem -Path $downloadsPath -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-    }
-}
-
 function Clear-RecycleBinAllDrives {
     Clear-RecycleBin -Force -ErrorAction SilentlyContinue
 }
@@ -108,7 +101,7 @@ function Disable-VisualEffects {
 }
 
 function Remove-Bloatware {
-    Write-Host "`n  -> Creando punto de restauración..." -NoNewline
+    Write-Host "`n  -&gt; Creando punto de restauración..." -NoNewline
     try {
         Checkpoint-Computer -Description "Antes de eliminar Bloatware con Script de Optimización" -ErrorAction Stop
         Write-Host " [OK]" -ForegroundColor Green
@@ -119,7 +112,7 @@ function Remove-Bloatware {
         return
     }
 
-    Write-Host "  -> Eliminando aplicaciones preinstaladas (Bloatware)..."
+    Write-Host "  -&gt; Eliminando aplicaciones preinstaladas (Bloatware)..."
     $bloatware = @(
         "*3DBuilder*", "*3DViewer*", "*BingFinance*", "*BingNews*", "*BingSports*", 
         "*BingWeather*", "*CandyCrush*", "*king.com*", "*EclipseManager*", "*Facebook*",
@@ -192,6 +185,24 @@ function Optimize-BackgroundProcesses {
     Set-ItemProperty -Path $regPath -Name "AllowTelemetry" -Value 0 -Force
 }
 
+function Disable-SysMain {
+    $servicio = Get-Service -Name "SysMain" -ErrorAction SilentlyContinue
+    if ($null -ne $servicio) {
+        if ($servicio.Status -ne 'Stopped') {
+            Stop-Service -Name "SysMain" -Force -ErrorAction SilentlyContinue
+        }
+        if ($servicio.StartType -ne 'Disabled') {
+            Set-Service -Name "SysMain" -StartupType Disabled -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+function Clear-OldDrivers {
+    # Esta utilidad elimina los paquetes de controladores que no están en uso.
+    # Es un proceso seguro que puede tardar unos minutos.
+    pnputil.exe /delete-driver oem*.inf /uninstall /force | Out-Null
+}
+
 function Repair-SystemFiles {
     Write-Progress -Activity "Reparando Sistema" -Status "Paso 1/2: Ejecutando SFC /scannow (esto puede tardar)..." -PercentComplete 0
     Start-Process sfc.exe -ArgumentList "/scannow" -Wait -NoNewWindow
@@ -252,19 +263,20 @@ Write-TaskStatus -TaskName "Verificando conexión a Internet" -Action { Test-Int
 Write-Host "`n[Paso 2: Limpieza del Sistema]" -ForegroundColor Yellow
 Write-TaskStatus -TaskName "Limpiando archivos temporales" -Action { Clear-TemporaryFiles }
 Write-TaskStatus -TaskName "Vaciando la Papelera de Reciclaje" -Action { Clear-RecycleBinAllDrives }
-Write-TaskStatus -TaskName "Limpiando carpeta de Descargas (¡PRECAUCIÓN!)" -Action { Clear-DownloadsFolder }
 
 Write-Host "`n[Paso 3: Optimización de Rendimiento]" -ForegroundColor Yellow
 Write-TaskStatus -TaskName "Optimizando configuración de red" -Action { Set-NetworkOptimization }
 Write-TaskStatus -TaskName "Limpiando caché de DNS" -Action { Flush-DnsCache }
 Write-TaskStatus -TaskName "Deshabilitando aplicaciones de inicio" -Action { Disable-StartupApps }
 Write-TaskStatus -TaskName "Desactivando telemetría y servicios en segundo plano" -Action { Optimize-BackgroundProcesses }
+Write-TaskStatus -TaskName "Desactivando servicio de precarga (SysMain/Superfetch)" -Action { Disable-SysMain }
 Write-TaskStatus -TaskName "Desactivando características de juego de Xbox" -Action { Disable-GamingFeatures }
 Write-TaskStatus -TaskName "Ajustando efectos visuales para rendimiento" -Action { Disable-VisualEffects }
 Write-TaskStatus -TaskName "Optimizando unidades de disco (Defrag/TRIM)" -Action { Optimize-Drives }
 
 Write-Host "`n[Paso 4: Mantenimiento Profundo]" -ForegroundColor Yellow
 Remove-Bloatware
+Write-TaskStatus -TaskName "Limpiando drivers antiguos del sistema (puede tardar)" -Action { Clear-OldDrivers }
 Write-TaskStatus -TaskName "Reparando archivos de sistema (SFC y DISM)" -Action { Repair-SystemFiles }
 
 Get-DiskSpace
