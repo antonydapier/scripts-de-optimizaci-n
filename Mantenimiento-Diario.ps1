@@ -1,7 +1,7 @@
 # ================================================================
 # Script de Mantenimiento y Optimización de Windows
 # Autor: Antony Dapier
-# Versión: 7.1
+# Versión: 7.2
 # ================================================================
 
 [CmdletBinding(SupportsShouldProcess=$true)]
@@ -89,6 +89,24 @@ function Flush-DnsCache {
     ipconfig /flushdns | Out-Null
 }
 
+function Set-GoogleDns {
+    $googleDns = "8.8.8.8", "8.8.4.4"
+    # Obtener los adaptadores de red activos (Ethernet, Wi-Fi) que usan IPv4
+    $networkAdapters = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' -and ($_.MediaType -eq '802.3' -or $_.MediaType -eq 'Native 802.11') }
+    
+    if ($null -eq $networkAdapters -or $networkAdapters.Count -eq 0) {
+        throw "No se encontraron adaptadores de red activos (Ethernet o Wi-Fi)."
+    }
+
+    foreach ($adapter in $networkAdapters) {
+        # Solo modificar adaptadores que tienen una configuración IP
+        $ipconfig = Get-NetIPConfiguration -InterfaceIndex $adapter.InterfaceIndex
+        if ($ipconfig.IPv4Address.IPAddress) {
+            Set-DnsClientServerAddress -InterfaceIndex $adapter.InterfaceIndex -ServerAddresses $googleDns
+        }
+    }
+}
+
 function Set-NetworkOptimization {
     $regPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings"
     Set-ItemProperty -Path $regPath -Name "MaxConnectionsPerServer" -Value 10 -Force
@@ -130,7 +148,7 @@ function Remove-Bloatware {
 }
 
 function Disable-StartupApps {
-    $startupExclusions = @("security", "antivirus", "defender", "nvidia", "amd", "intel", "audio", "realtek", "synaptics", "onedrive", "dropbox")
+    $startupExclusions = @("security", "antivirus", "defender", "nvidia", "amd", "intel", "audio", "realtek", "synaptics", "onedrive", "dropbox", "bootcamp")
     $runKeys = @("HKCU:\Software\Microsoft\Windows\CurrentVersion\Run", "HKLM:\Software\Microsoft\Windows\CurrentVersion\Run")
 
     foreach ($key in $runKeys) {
@@ -207,7 +225,7 @@ function Repair-SystemFiles {
     Write-Progress -Activity "Reparando Sistema" -Status "Paso 1/2: Ejecutando SFC /scannow (esto puede tardar)..." -PercentComplete 0
     Start-Process sfc.exe -ArgumentList "/scannow" -Wait -NoNewWindow
     
-    Write-Progress -Activity "Reparando Sistema" -Status "Paso 2/2: Ejecutando DISM (esto puede tardar aún más)..." -PercentComplete 50
+    Write-Progress -Activity "Repararing Sistema" -Status "Paso 2/2: Ejecutando DISM (esto puede tardar aún más)..." -PercentComplete 50
     Start-Process Dism.exe -ArgumentList "/Online /Cleanup-Image /RestoreHealth" -Wait -NoNewWindow
     
     Write-Progress -Activity "Reparando Sistema" -Status "Completado." -Completed
@@ -265,6 +283,7 @@ Write-TaskStatus -TaskName "Limpiando archivos temporales" -Action { Clear-Tempo
 Write-TaskStatus -TaskName "Vaciando la Papelera de Reciclaje" -Action { Clear-RecycleBinAllDrives }
 
 Write-Host "`n[Paso 3: Optimización de Rendimiento]" -ForegroundColor Yellow
+Write-TaskStatus -TaskName "Configurando DNS de Google (8.8.8.8, 8.8.4.4)" -Action { Set-GoogleDns }
 Write-TaskStatus -TaskName "Optimizando configuración de red" -Action { Set-NetworkOptimization }
 Write-TaskStatus -TaskName "Limpiando caché de DNS" -Action { Flush-DnsCache }
 Write-TaskStatus -TaskName "Deshabilitando aplicaciones de inicio" -Action { Disable-StartupApps }
