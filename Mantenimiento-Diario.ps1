@@ -1,7 +1,7 @@
 # ================================================================
-# Script de Mantenimiento y Optimización de Windows
+# Script de Mantenimiento y Optimización de Windows 10 y Windows 11
 # Autor: Antony Dapier
-# Versión: 7.2
+# Versión: 8.0
 # ================================================================
 
 [CmdletBinding(SupportsShouldProcess=$true)]
@@ -33,10 +33,10 @@ function Write-TaskStatus {
         [Parameter(Mandatory=$true)]
         [string]$TaskName,
 
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandary=$true)]
         [scriptblock]$Action
     )
-    Write-Host -NoNewline "  -&gt; $TaskName..."
+    Write-Host -NoNewline "  -> $TaskName..."
     try {
         & $Action
         Write-Host " [OK]" -ForegroundColor Green
@@ -114,12 +114,19 @@ function Set-NetworkOptimization {
 }
 
 function Disable-VisualEffects {
+    # Ajusta para mejor rendimiento (desactiva todo)
     Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects" -Name "VisualFxSetting" -Value 2 -Force
+
+    # Reactiva específicamente el suavizado de fuentes y las miniaturas para un mejor balance
+    Set-ItemProperty -Path "HKCU\Control Panel\Desktop" -Name "FontSmoothing" -Value "2" -Type String -Force
+    Set-ItemProperty -Path "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "IconsOnly" -Value 0 -Type DWord -Force
+
+    # Desactiva la transparencia (efecto adicional para rendimiento)
     Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "EnableTransparency" -Value 0 -Force
 }
 
 function Remove-Bloatware {
-    Write-Host "`n  -&gt; Creando punto de restauración..." -NoNewline
+    Write-Host "`n  -> Creando punto de restauración..." -NoNewline
     try {
         Checkpoint-Computer -Description "Antes de eliminar Bloatware con Script de Optimización" -ErrorAction Stop
         Write-Host " [OK]" -ForegroundColor Green
@@ -130,16 +137,28 @@ function Remove-Bloatware {
         return
     }
 
-    Write-Host "  -&gt; Eliminando aplicaciones preinstaladas (Bloatware)..."
-    $bloatware = @(
-        "*3DBuilder*", "*3DViewer*", "*BingFinance*", "*BingNews*", "*BingSports*", 
-        "*BingWeather*", "*CandyCrush*", "*king.com*", "*EclipseManager*", "*Facebook*",
-        "*HiddenCity*", "*Minecraft*", "*OneConnect*", "*OneNote*", 
-        "*Microsoft.People*", "*Photos*", "*SkypeApp*", "*Twitter*", 
-        "*Wallet*", "*YourPhone*", "*ZuneMusic*", "*ZuneVideo*", 
-        "*XboxApp*", "*XboxGamingOverlay*", "*XboxSpeechToTextOverlay*",
-        "*MixedReality.Portal*"
-    )
+    $osVersion = (Get-CimInstance -ClassName Win32_OperatingSystem).Caption
+    Write-Host "  -> Eliminando aplicaciones preinstaladas (Bloatware) de $osVersion..."
+
+    if ($osVersion -like "*Windows 11*") {
+        $bloatware = @(
+            "*BingFinance*", "*BingNews*", "*BingSports*", "*BingWeather*", "*SolitaireCollection*",
+            "*MicrosoftTeams*", "*Clipchamp*", "*Alarms*", "*Calculator*", "*Camera*",
+            "*Family*", "*GetHelp*", "*GetStarted*", "*Maps*", "*MediaEngine*", "*ZuneMusic*",
+            "*ZuneVideo*", "*MixedReality*", "*YourPhone*", "*Windows.Photos*", "*XboxApp*"
+        )
+    } else {
+        $bloatware = @(
+            "*3DBuilder*", "*3DViewer*", "*BingFinance*", "*BingNews*", "*BingSports*", 
+            "*BingWeather*", "*CandyCrush*", "*king.com*", "*EclipseManager*", "*Facebook*",
+            "*HiddenCity*", "*Minecraft*", "*OneConnect*", "*OneNote*", 
+            "*Microsoft.People*", "*Photos*", "*SkypeApp*", "*Twitter*", 
+            "*Wallet*", "*YourPhone*", "*ZuneMusic*", "*ZuneVideo*", 
+            "*XboxApp*", "*XboxGamingOverlay*", "*XboxSpeechToTextOverlay*",
+            "*MixedReality.Portal*"
+        )
+    }
+    
     foreach ($app in $bloatware) {
         Get-AppxPackage -AllUsers -Name $app | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue
         Get-AppxProvisionedPackage -Online | Where-Object { $_.DisplayName -like $app } | Remove-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue
@@ -290,11 +309,15 @@ Write-TaskStatus -TaskName "Deshabilitando aplicaciones de inicio" -Action { Dis
 Write-TaskStatus -TaskName "Desactivando telemetría y servicios en segundo plano" -Action { Optimize-BackgroundProcesses }
 Write-TaskStatus -TaskName "Desactivando servicio de precarga (SysMain/Superfetch)" -Action { Disable-SysMain }
 Write-TaskStatus -TaskName "Desactivando características de juego de Xbox" -Action { Disable-GamingFeatures }
+Write-TaskStatus -TaskName "Eliminando límite de ancho de banda reservable" -Action { Set-BandwidthLimit }
 Write-TaskStatus -TaskName "Ajustando efectos visuales para rendimiento" -Action { Disable-VisualEffects }
 Write-TaskStatus -TaskName "Optimizando unidades de disco (Defrag/TRIM)" -Action { Optimize-Drives }
 
-Write-Host "`n[Paso 4: Mantenimiento Profundo]" -ForegroundColor Yellow
+Write-Host "`n[Paso 4: Optimización de Aplicaciones]" -ForegroundColor Yellow
 Remove-Bloatware
+Optimize-GoogleChrome
+
+Write-Host "`n[Paso 5: Mantenimiento Profundo]" -ForegroundColor Yellow
 Write-TaskStatus -TaskName "Limpiando drivers antiguos del sistema (puede tardar)" -Action { Clear-OldDrivers }
 Write-TaskStatus -TaskName "Reparando archivos de sistema (SFC y DISM)" -Action { Repair-SystemFiles }
 
