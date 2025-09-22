@@ -82,9 +82,12 @@ function Clear-RecycleBinAllDrives {
 
 function Clear-SoftwareDistribution {
     # Detener el servicio de Windows Update para liberar los archivos
-    Stop-Service -Name wuauserv -Force -ErrorAction SilentlyContinue
-    # Esperar un momento para que el servicio se detenga completamente
-    Start-Sleep -Seconds 3
+    $service = Get-Service -Name wuauserv -ErrorAction SilentlyContinue
+    if ($null -ne $service -and $service.Status -ne 'Stopped') {
+        Stop-Service -Name wuauserv -Force -ErrorAction SilentlyContinue
+        # Esperar de forma fiable a que el servicio se detenga (hasta 30 segundos)
+        $service.WaitForStatus('Stopped', [System.TimeSpan]::FromSeconds(30))
+    }
 
     $path = "C:\Windows\SoftwareDistribution\Download"
     if (Test-Path $path) {
@@ -171,8 +174,8 @@ function Remove-Bloatware {
     if ($osVersion -like "*Windows 11*") {
         $bloatware = @(
             "*BingFinance*", "*BingNews*", "*BingSports*", "*BingWeather*", "*SolitaireCollection*",
-            "*MicrosoftTeams*", "*Clipchamp*", "*Alarms*", "*Calculator*", "*Camera*",
-            "*Family*", "*GetHelp*", "*GetStarted*", "*Maps*", "*MediaEngine*", "*ZuneMusic*",
+            "*MicrosoftTeams*", "*Clipchamp*", "*Alarms*", # "*Calculator*", # "*Camera*",
+            "*Family*", "*GetHelp*", "*GetStarted*", "*Maps*", "*MediaEngine*", "*ZuneMusic*", 
             "*ZuneVideo*", "*MixedReality*", "*YourPhone*", "*Windows.Photos*", "*XboxApp*"
         )
     } else {
@@ -299,9 +302,6 @@ function Optimize-GoogleChrome {
         Write-Host " [FALLÓ]" -ForegroundColor Red
         Log-Error "No se pudieron eliminar algunos archivos de datos de Chrome. Error: $($_.Exception.Message)"
     }
-
-    Write-Host "`n    -> NOTA: La optimización de 'chrome://flags' no se realiza automáticamente." -ForegroundColor Cyan
-    Write-Host "       Modificar estas opciones experimentales por script es inestable y riesgoso." -ForegroundColor Cyan
 }
 
 function Optimize-Adobe {
@@ -339,9 +339,13 @@ function Optimize-BackgroundProcesses {
     $serviciosADeshabilitar = @( "DiagTrack", "dmwappushsvc", "WMPNetworkSvc", "RemoteRegistry", "RetailDemo", "diagnosticshub.standardcollector.service", "MapsBroker", "Fax" )
     foreach ($s in $serviciosADeshabilitar) {
         $servicio = Get-Service -Name $s -ErrorAction SilentlyContinue
-        if ($null -ne $servicio -and $servicio.Status -ne 'Stopped') {
-            Stop-Service -Name $s -Force -ErrorAction SilentlyContinue
-            Set-Service -Name $s -StartupType Disabled -ErrorAction SilentlyContinue
+        if ($null -ne $servicio) {
+            if ($servicio.Status -ne 'Stopped') {
+                Stop-Service -Name $s -Force -ErrorAction SilentlyContinue
+            }
+            if ($servicio.StartType -ne 'Disabled') {
+                Set-Service -Name $s -StartupType Disabled -ErrorAction SilentlyContinue
+            }
         }
     }
     $tareasTelemetria = @( "\Microsoft\Windows\Application Experience\ProgramDataUpdater", "\Microsoft\Windows\Autochk\Proxy", "\Microsoft\Windows\Customer Experience Improvement Program\Consolidator", "\Microsoft\Windows\Customer Experience Improvement Program\KernelCeipTask", "\Microsoft\Windows\Customer Experience Improvement Program\UsbCeip", "\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticDataCollector" )
@@ -385,16 +389,14 @@ function Clear-OldDrivers {
 }
 
 function Repair-SystemFiles {
-    Write-Progress -Activity "Reparando Sistema" -Status "Paso 1/3: Limpiando componentes de Windows Update..." -PercentComplete 0
-    Start-Process Dism.exe -ArgumentList "/Online /Cleanup-Image /StartComponentCleanup" -Wait -NoNewWindow
+    Write-Host "`n     -> Paso 1/3: Limpiando componentes de Windows Update..." -ForegroundColor Gray
+    Dism.exe /Online /Cleanup-Image /StartComponentCleanup
 
-    Write-Progress -Activity "Reparando Sistema" -Status "Paso 2/3: Ejecutando SFC /scannow (esto puede tardar)..." -PercentComplete 33
-    Start-Process sfc.exe -ArgumentList "/scannow" -Wait -NoNewWindow
-    
-    Write-Progress -Activity "Reparando Sistema" -Status "Paso 3/3: Ejecutando DISM /RestoreHealth (esto puede tardar aún más)..." -PercentComplete 66
-    Start-Process Dism.exe -ArgumentList "/Online /Cleanup-Image /RestoreHealth" -Wait -NoNewWindow
-    
-    Write-Progress -Activity "Reparando Sistema" -Status "Completado." -Completed
+    Write-Host "`n     -> Paso 2/3: Ejecutando SFC /scannow (esto puede tardar)..." -ForegroundColor Gray
+    sfc.exe /scannow
+
+    Write-Host "`n     -> Paso 3/3: Ejecutando DISM /RestoreHealth (esto puede tardar aún más)..." -ForegroundColor Gray
+    Dism.exe /Online /Cleanup-Image /RestoreHealth
 }
 
 function Optimize-Drives {
