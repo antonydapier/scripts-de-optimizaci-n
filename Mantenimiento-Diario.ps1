@@ -17,10 +17,14 @@ param (
 # Usar un método más robusto para encontrar el Escritorio, compatible con OneDrive.
 $desktopPath = [System.Environment]::GetFolderPath('Desktop')
 $informePath = Join-Path -Path $desktopPath -ChildPath "Informe de Optimización by Antony Dapier ($(Get-Date -Format 'yyyy-MM-dd_HH-mm-ss')).txt"
+$customHeader = "Gracias por usar mi Script Enfocado a Optimizar Windows 10 y Windows 11 Para Diseñadores y Publico en general. Antony Dapier`n"
+
 try {
-    Start-Transcript -Path $informePath -ErrorAction Stop
-    # Escribir la cabecera personalizada en el informe
-    Write-Output "Gracias por usar mi script, si llegas a tener algun problema puedes enviarme este mismo archivo. Saludos Antony Dapier`n"
+    # 1. Crear el archivo y escribir la cabecera personalizada primero.
+    $customHeader | Out-File -FilePath $informePath -Encoding utf8 -ErrorAction Stop
+    
+    # 2. Iniciar la transcripción, añadiendo el contenido al archivo ya existente.
+    Start-Transcript -Path $informePath -Append -ErrorAction Stop
 } catch {
     Write-Host "No se pudo crear el archivo de informe en '$($informePath)'. Verifique los permisos." -ForegroundColor Red
     exit
@@ -291,38 +295,50 @@ function Optimize-GoogleChrome {
     }
 
     # --- Limpieza de Datos de Navegación ---
-    Write-Host -NoNewline "    -> Limpiando datos de navegación (cerrando Chrome a la fuerza)..."
-    $chromeProcesses = Get-Process -Name "chrome" -ErrorAction SilentlyContinue
-    if ($chromeProcesses) {
-        # Se usa taskkill para un cierre más robusto que incluye procesos hijos y en segundo plano.
-        taskkill.exe /F /IM chrome.exe /T | Out-Null
-        Start-Sleep -Seconds 2 # Dar tiempo al sistema para que libere los archivos bloqueados.
-    }
-
+    Write-Host -NoNewline "    -> Limpiando datos de navegación (cerrando Chrome y limpiando perfiles)..."
     try {
-        $chromeUserData = "$env:LOCALAPPDATA\Google\Chrome\User Data"
-        # Limpiar perfiles (Default y Profile *)
-        $profiles = Get-ChildItem -Path "$chromeUserData\Default", "$chromeUserData\Profile *" -Directory -ErrorAction SilentlyContinue
-        foreach ($profile in $profiles) {
-            # Lista aún más ampliada, incluyendo archivos temporales de bases de datos (.db-journal) y datos de sesión.
-            $itemsAndFoldersToRemove = @(
-                # Archivos de base de datos y sus journals
-                "$($profile.FullName)\History", "$($profile.FullName)\History-journal",
-                "$($profile.FullName)\Top Sites", "$($profile.FullName)\Top Sites-journal",
-                "$($profile.FullName)\Visited Links", "$($profile.FullName)\Visited Links-journal",
-                "$($profile.FullName)\Web Data", "$($profile.FullName)\Web Data-journal",
-                # Carpetas de caché y sesión
-                "$($profile.FullName)\Cache", "$($profile.FullName)\Code Cache", "$($profile.FullName)\GPUCache", "$($profile.FullName)\Media Cache", "$($profile.FullName)\Session Storage"
-            )
-            foreach ($item in $itemsAndFoldersToRemove) {
-                if (Test-Path $item) {
-                    # -Recurse es para carpetas, pero no daña la eliminación de archivos individuales.
-                    Remove-Item -Path $item -Recurse -Force -ErrorAction SilentlyContinue
+        $chromeProcesses = Get-Process -Name "chrome" -ErrorAction SilentlyContinue
+        if ($chromeProcesses) {
+            # Se usa taskkill para un cierre más robusto que incluye procesos hijos y en segundo plano.
+            taskkill.exe /F /IM chrome.exe /T | Out-Null
+            Start-Sleep -Seconds 2 # Dar tiempo al sistema para que libere los archivos bloqueados.
+        }
+
+        $cleanedSomething = $false
+        # Obtener todos los perfiles de usuario no especiales (ej. usuarios reales) para buscar datos de Chrome.
+        $userProfiles = Get-CimInstance -ClassName Win32_UserProfile | Where-Object { -not $_.Special }
+
+        foreach ($userProfile in $userProfiles) {
+            $chromeUserDataPath = Join-Path -Path $userProfile.LocalPath -ChildPath "AppData\Local\Google\Chrome\User Data"
+            if (-not (Test-Path $chromeUserDataPath)) {
+                continue # No hay datos de Chrome para este usuario.
+            }
+
+            # Buscar y limpiar todos los perfiles de Chrome (Default, Profile 1, etc.) para este usuario.
+            $chromeProfiles = Get-ChildItem -Path $chromeUserDataPath -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq 'Default' -or $_.Name -like 'Profile *' }
+            
+            foreach ($profile in $chromeProfiles) {
+                $cleanedSomething = $true
+                # Lista de archivos y carpetas a eliminar para una limpieza completa del historial y caché.
+                $itemsAndFoldersToRemove = @(
+                    "$($profile.FullName)\History", "$($profile.FullName)\History-journal",
+                    "$($profile.FullName)\Top Sites", "$($profile.FullName)\Top Sites-journal",
+                    "$($profile.FullName)\Visited Links", "$($profile.FullName)\Visited Links-journal",
+                    "$($profile.FullName)\Web Data", "$($profile.FullName)\Web Data-journal",
+                    "$($profile.FullName)\Cache", "$($profile.FullName)\Code Cache", "$($profile.FullName)\GPUCache", "$($profile.FullName)\Media Cache", "$($profile.FullName)\Session Storage"
+                )
+                foreach ($item in $itemsAndFoldersToRemove) {
+                    if (Test-Path $item) {
+                        Remove-Item -Path $item -Recurse -Force -ErrorAction SilentlyContinue
+                    }
                 }
             }
         }
+
         Write-Host " [OK]" -ForegroundColor Green
-        Write-Host "       NOTA: Si tienes la sesión iniciada en Chrome, parte del historial podría restaurarse desde la nube." -ForegroundColor Gray
+        if ($cleanedSomething) {
+            Write-Host "       NOTA: Si tienes la sesión iniciada en Chrome, parte del historial podría restaurarse desde la nube." -ForegroundColor Gray
+        }
     } catch {
         Write-Host " [FALLÓ]" -ForegroundColor Red
         Log-Error "No se pudieron eliminar algunos archivos de datos de Chrome. Error: $($_.Exception.Message)"
@@ -481,6 +497,14 @@ function Handle-SmartRestart {
 # ==============================
 
 Confirm-IsAdmin
+
+# --- MENSAJE DE BIENVENIDA ---
+Write-Host "`n***********************************************************************" -ForegroundColor Cyan
+Write-Host "   Gracias por usar este Script de Optimización para Windows 10 y 11" -ForegroundColor White
+Write-Host "   Enfocado para Diseñadores y Público en general." -ForegroundColor White
+Write-Host "   " # Línea en blanco para espaciar
+Write-Host "   Autor: Antony Dapier" -ForegroundColor White
+Write-Host "***********************************************************************" -ForegroundColor Cyan
 
 # --- ADVERTENCIA INICIAL ---
 Write-Host "`n=======================================================================" -ForegroundColor Yellow
