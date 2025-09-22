@@ -347,15 +347,12 @@ function Optimize-Adobe {
 
 function Optimize-BackgroundProcesses {
     $serviciosADeshabilitar = @( "DiagTrack", "dmwappushsvc", "WMPNetworkSvc", "RemoteRegistry", "RetailDemo", "diagnosticshub.standardcollector.service", "MapsBroker", "Fax" )
-    foreach ($s in $serviciosADeshabilitar) {
-        $servicio = Get-Service -Name $s -ErrorAction SilentlyContinue
-        if ($servicio) {
-            if ($servicio.Status -ne 'Stopped') {
-                Stop-Service -Name $s -Force -ErrorAction SilentlyContinue
-            }
-            if ($servicio.StartType -ne 'Disabled') {
-                Set-Service -Name $s -StartupType Disabled -ErrorAction SilentlyContinue
-            }
+    Get-Service -Name $serviciosADeshabilitar -ErrorAction SilentlyContinue | ForEach-Object {
+        if ($_.Status -ne 'Stopped') {
+            $_ | Stop-Service -Force -ErrorAction SilentlyContinue
+        }
+        if ($_.StartType -ne 'Disabled') {
+            $_ | Set-Service -StartupType Disabled -ErrorAction SilentlyContinue
         }
     }
     $tareasTelemetria = @( "\Microsoft\Windows\Application Experience\ProgramDataUpdater", "\Microsoft\Windows\Autochk\Proxy", "\Microsoft\Windows\Customer Experience Improvement Program\Consolidator", "\Microsoft\Windows\Customer Experience Improvement Program\KernelCeipTask", "\Microsoft\Windows\Customer Experience Improvement Program\UsbCeip", "\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticDataCollector" )
