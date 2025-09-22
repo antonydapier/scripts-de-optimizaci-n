@@ -78,6 +78,28 @@ function Clear-RecycleBinAllDrives {
     Clear-RecycleBin -Force -ErrorAction SilentlyContinue
 }
 
+function Clear-SoftwareDistribution {
+    # Detener el servicio de Windows Update para liberar los archivos
+    Stop-Service -Name wuauserv -Force -ErrorAction SilentlyContinue
+    # Esperar un momento para que el servicio se detenga completamente
+    Start-Sleep -Seconds 3
+
+    $path = "C:\Windows\SoftwareDistribution\Download"
+    if (Test-Path $path) {
+        Get-ChildItem -Path $path -Recurse -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    # Reiniciar el servicio de Windows Update
+    Start-Service -Name wuauserv -ErrorAction SilentlyContinue
+}
+
+function Clear-EventLogs {
+    $logs = Get-WinEvent -ListLog * -ErrorAction SilentlyContinue
+    foreach ($log in $logs) {
+        wevtutil.exe cl $log.LogName | Out-Null
+    }
+}
+
 function Get-DiskSpace {
     Write-Host "`nEspacio en disco disponible:" -ForegroundColor Yellow
     Get-PSDrive -PSProvider FileSystem | ForEach-Object {
@@ -99,9 +121,11 @@ function Set-GoogleDns {
     }
 
     foreach ($adapter in $networkAdapters) {
+        Write-Host "`n     -> Configurando DNS para $($adapter.Name)..." -ForegroundColor Gray
         # Solo modificar adaptadores que tienen una configuración IP
         $ipconfig = Get-NetIPConfiguration -InterfaceIndex $adapter.InterfaceIndex
         if ($ipconfig.IPv4Address.IPAddress) {
+            # El comando Set-DnsClientServerAddress ya muestra un output, no necesitamos más confirmación.
             Set-DnsClientServerAddress -InterfaceIndex $adapter.InterfaceIndex -ServerAddresses $googleDns
         }
     }
@@ -159,10 +183,18 @@ function Remove-Bloatware {
         )
     }
     
-    foreach ($app in $bloatware) {
-        Get-AppxPackage -AllUsers -Name $app | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue
-        Get-AppxProvisionedPackage -Online | Where-Object { $_.DisplayName -like $app } | Remove-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue
+    # Optimización: Obtener las listas una sola vez
+    $allPackages = Get-AppxPackage -AllUsers
+    $allProvisionedPackages = Get-AppxProvisionedPackage -Online
+
+    foreach ($pattern in $bloatware) {
+        # Eliminar paquetes de usuario
+        $allPackages | Where-Object { $_.Name -like $pattern } | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue
+
+        # Eliminar paquetes provisionados para futuros usuarios
+        $allProvisionedPackages | Where-Object { $_.DisplayName -like $pattern } | Remove-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue
     }
+
     Write-Host "     Limpieza de Bloatware completada." -ForegroundColor Green
 }
 
@@ -183,7 +215,7 @@ function Disable-StartupApps {
                     try {
                         Move-ItemProperty -Path $key -Destination $backupKey -Name $appName -Force -ErrorAction Stop
                     } catch {
-                        # Silently ignore if it fails, as it's not critical
+                        Write-Warning "No se pudo deshabilitar la app de inicio '$appName'. Es posible que se requieran permisos adicionales."
                     }
                 }
             }
@@ -198,6 +230,105 @@ function Disable-GamingFeatures {
     $xboxServices = @("XblAuthManager", "XblGameSave", "XboxGipSvc", "XboxNetApiSvc")
     foreach ($service in $xboxServices) {
         if (Get-Service -Name $service -ErrorAction SilentlyContinue) { Set-Service -Name $service -StartupType Disabled -ErrorAction SilentlyContinue }
+    }
+}
+
+function Set-BandwidthLimit {
+    # Habilita la política y establece el límite de ancho de banda reservable en 0%.
+    $regPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Psched"
+    if (-not (Test-Path $regPath)) { New-Item -Path $regPath -Force | Out-Null }
+    Set-ItemProperty -Path $regPath -Name "NonBestEffortLimit" -Value 0 -Type DWord -Force
+}
+
+function Optimize-GoogleChrome {
+    Write-Host "`n  -> Optimizando Google Chrome..."
+    $chromeExePath = "$env:ProgramFiles\Google\Chrome\Application\chrome.exe"
+    $chromeExePathX86 = "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe"
+    if (-not (Test-Path $chromeExePath) -and -not (Test-Path $chromeExePathX86)) {
+        Write-Host " [NO APLICA - Chrome no encontrado]" -ForegroundColor Yellow
+        return
+    }
+    Write-Host # Newline para continuar con las subtareas
+
+    # --- Configuración de Políticas (método recomendado y seguro) ---
+    Write-Host -NoNewline "    -> Aplicando políticas de rendimiento..."
+    try {
+        $policyPath = "HKLM:\SOFTWARE\Policies\Google\Chrome"
+        if (-not (Test-Path $policyPath)) { New-Item -Path $policyPath -Force -ErrorAction Stop | Out-Null }
+
+        # Desactivar "Seguir ejecutando aplicaciones en segundo plano"
+        Set-ItemProperty -Path $policyPath -Name "BackgroundModeEnabled" -Value 0 -Type DWord -Force -ErrorAction Stop
+        
+        # Activar "Usar aceleración por hardware"
+        Set-ItemProperty -Path $policyPath -Name "HardwareAccelerationModeEnabled" -Value 1 -Type DWord -Force -ErrorAction Stop
+
+        # Activar "Ahorro de memoria"
+        $perfPolicyPath = "HKLM:\SOFTWARE\Policies\Google\Chrome\Performance"
+        if (-not (Test-Path $perfPolicyPath)) { New-Item -Path $perfPolicyPath -Force -ErrorAction Stop | Out-Null }
+        Set-ItemProperty -Path $perfPolicyPath -Name "MemorySaverModeEnabled" -Value 1 -Type DWord -Force -ErrorAction Stop
+
+        Write-Host " [OK]" -ForegroundColor Green
+    } catch {
+        Write-Host " [FALLÓ]" -ForegroundColor Red
+        Log-Error "No se pudieron aplicar las políticas de registro para Chrome. Error: $($_.Exception.Message)"
+    }
+
+    # --- Limpieza de Datos de Navegación ---
+    Write-Host -NoNewline "    -> Limpiando datos de navegación (cerrando Chrome)..."
+    $chromeProcesses = Get-Process -Name "chrome" -ErrorAction SilentlyContinue
+    if ($chromeProcesses) {
+        Stop-Process -Name "chrome" -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 2 # Dar tiempo a que los procesos terminen
+    }
+
+    try {
+        $chromeUserData = "$env:LOCALAPPDATA\Google\Chrome\User Data"
+        # Limpiar perfiles (Default y Profile *)
+        $profiles = Get-ChildItem -Path $chromeUserData -Directory -Filter "Default"
+        $profiles += Get-ChildItem -Path $chromeUserData -Directory -Filter "Profile *"
+        foreach ($profile in $profiles) {
+            Remove-Item -Path "$($profile.FullName)\History" -Force -ErrorAction SilentlyContinue
+            Remove-Item -Recurse -Path "$($profile.FullName)\Cache" -Force -ErrorAction SilentlyContinue
+            Remove-Item -Recurse -Path "$($profile.FullName)\Code Cache" -Force -ErrorAction SilentlyContinue
+        }
+        Write-Host " [OK]" -ForegroundColor Green
+    } catch {
+        Write-Host " [FALLÓ]" -ForegroundColor Red
+        Log-Error "No se pudieron eliminar algunos archivos de datos de Chrome. Error: $($_.Exception.Message)"
+    }
+
+    Write-Host "`n    -> NOTA: La optimización de 'chrome://flags' no se realiza automáticamente." -ForegroundColor Cyan
+    Write-Host "       Modificar estas opciones experimentales por script es inestable y riesgoso." -ForegroundColor Cyan
+}
+
+function Optimize-Adobe {
+    Write-Host "`n  -> Optimizando aplicaciones de Adobe (limpieza de caché)..."
+    $adobePath = "$env:ProgramFiles\Adobe"
+    if (-not (Test-Path $adobePath)) {
+        Write-Host " [NO APLICA - No se detectó instalación de Adobe]" -ForegroundColor Yellow
+        return
+    }
+
+    Write-Host -NoNewline "    -> Cerrando procesos de Adobe..."
+    $adobeApps = @("Photoshop", "Illustrator", "InDesign", "Premiere Pro", "AfterFX", "Audition", "Bridge")
+    $processes = Get-Process -Name $adobeApps -ErrorAction SilentlyContinue
+    if ($processes) {
+        $processes | Stop-Process -Force -ErrorAction SilentlyContinue
+        Write-Host " [OK]" -ForegroundColor Green
+    } else {
+        Write-Host " [No hay procesos activos]" -ForegroundColor Gray
+    }
+
+    Write-Host -NoNewline "    -> Limpiando caché de medios de Adobe..."
+    try {
+        $cachePaths = @("$env:APPDATA\Adobe\Common\Media Cache", "$env:APPDATA\Adobe\Common\Media Cache Files")
+        foreach ($path in $cachePaths) {
+            if (Test-Path $path) { Remove-Item -Path $path -Recurse -Force -ErrorAction Stop }
+        }
+        Write-Host " [OK]" -ForegroundColor Green
+    } catch {
+        Write-Host " [FALLÓ]" -ForegroundColor Red
+        Log-Error "No se pudo limpiar la caché de Adobe. Es posible que algunos archivos estuvieran en uso. Error: $($_.Exception.Message)"
     }
 }
 
@@ -236,23 +367,50 @@ function Disable-SysMain {
 
 function Clear-OldDrivers {
     # Esta utilidad elimina los paquetes de controladores que no están en uso.
-    # Es un proceso seguro que puede tardar unos minutos.
-    pnputil.exe /delete-driver oem*.inf /uninstall /force | Out-Null
+    # El método es seguro: solo elimina drivers que no están asociados a ningún dispositivo.
+    try {
+        $oldDrivers = Get-CimInstance -ClassName Win32_PnPSignedDriver | Where-Object { -not $_.DeviceID }
+        if ($null -eq $oldDrivers) { return }
+
+        foreach ($driver in $oldDrivers) {
+            # Usamos pnputil para una desinstalación limpia del paquete de drivers.
+            pnputil.exe /delete-driver $driver.InfName /uninstall /force | Out-Null
+        }
+    } catch {
+        throw "Ocurrió un error al intentar limpiar los drivers antiguos. Error: $($_.Exception.Message)"
+    }
 }
 
 function Repair-SystemFiles {
-    Write-Progress -Activity "Reparando Sistema" -Status "Paso 1/2: Ejecutando SFC /scannow (esto puede tardar)..." -PercentComplete 0
+    Write-Progress -Activity "Reparando Sistema" -Status "Paso 1/3: Limpiando componentes de Windows Update..." -PercentComplete 0
+    Start-Process Dism.exe -ArgumentList "/Online /Cleanup-Image /StartComponentCleanup" -Wait -NoNewWindow
+
+    Write-Progress -Activity "Reparando Sistema" -Status "Paso 2/3: Ejecutando SFC /scannow (esto puede tardar)..." -PercentComplete 33
     Start-Process sfc.exe -ArgumentList "/scannow" -Wait -NoNewWindow
     
-    Write-Progress -Activity "Repararing Sistema" -Status "Paso 2/2: Ejecutando DISM (esto puede tardar aún más)..." -PercentComplete 50
+    Write-Progress -Activity "Reparando Sistema" -Status "Paso 3/3: Ejecutando DISM /RestoreHealth (esto puede tardar aún más)..." -PercentComplete 66
     Start-Process Dism.exe -ArgumentList "/Online /Cleanup-Image /RestoreHealth" -Wait -NoNewWindow
     
     Write-Progress -Activity "Reparando Sistema" -Status "Completado." -Completed
 }
 
 function Optimize-Drives {
-    Get-Volume | Where-Object { $_.DriveType -eq 'Fixed' -and $_.FileSystem -ne 'RAW' } | ForEach-Object {
-        Optimize-Volume -DriveLetter $_.DriveLetter
+    $volumes = Get-Volume | Where-Object { $_.DriveType -eq 'Fixed' -and $_.FileSystem -ne 'RAW' -and $_.HealthStatus -eq 'Healthy' }
+    if ($null -eq $volumes) {
+        Write-Host "`n     -> No se encontraron unidades aptas para optimizar." -ForegroundColor Yellow
+        return
+    }
+    foreach ($volume in $volumes) {
+        Write-Host "`n     -> Optimizando Unidad $($volume.DriveLetter):..." -ForegroundColor Gray -NoNewline
+        # Optimize-Volume es inteligente: aplica TRIM en SSDs y Defrag en HDDs.
+        # Usamos -Verbose para capturar la salida detallada.
+        $result = Optimize-Volume -DriveLetter $volume.DriveLetter -Verbose 4>&1
+        if ($LASTEXITCODE -eq 0 -and $? -eq $true) {
+            $optimizationType = if ($result -like "*TRIM*") { "TRIM" } elseif ($result -like "*defragment*") { "Defragmentación" } else { "Optimización" }
+            Write-Host " [$optimizationType completada]" -ForegroundColor Green
+        } else {
+            throw "No se pudo optimizar la unidad $($volume.DriveLetter)."
+        }
     }
 }
 
@@ -290,6 +448,23 @@ function Handle-SmartRestart {
 
 Confirm-IsAdmin
 
+# --- ADVERTENCIA INICIAL ---
+Write-Host "`n=======================================================================" -ForegroundColor Yellow
+Write-Host "  ADVERTENCIA: Este script cerrará programas y modificará el sistema." -ForegroundColor Yellow
+Write-Host "  Por favor, GUARDE TODO SU TRABAJO y CIERRE TODAS LAS APLICACIONES." -ForegroundColor Yellow
+Write-Host "=======================================================================" -ForegroundColor Yellow
+try {
+    for ($i = 10; $i -ge 1; $i--) {
+        Write-Host -NoNewline "`rEl proceso comenzará automáticamente en $i segundos... (Presione CTRL+C para cancelar) "
+        Start-Sleep -Seconds 1
+    }
+    Write-Host "`n" # Newline after countdown
+} catch {
+    Write-Host "`n`nOperación cancelada por el usuario." -ForegroundColor Red
+    Stop-Transcript
+    exit
+}
+
 Write-Host "`n==========================================" -ForegroundColor Cyan
 Write-Host "=== INICIANDO SCRIPT DE OPTIMIZACIÓN ===" -ForegroundColor Cyan
 Write-Host "=========================================="
@@ -297,30 +472,32 @@ Write-Host "=========================================="
 Write-Host "`n[Paso 1: Preparación y Verificaciones]" -ForegroundColor Yellow
 Write-TaskStatus -TaskName "Verificando conexión a Internet" -Action { Test-InternetConnection }
 
-Write-Host "`n[Paso 2: Limpieza del Sistema]" -ForegroundColor Yellow
+Write-Host "`n[Paso 2: Limpieza Profunda del Sistema]" -ForegroundColor Yellow
 Write-TaskStatus -TaskName "Limpiando archivos temporales" -Action { Clear-TemporaryFiles }
 Write-TaskStatus -TaskName "Vaciando la Papelera de Reciclaje" -Action { Clear-RecycleBinAllDrives }
+Write-TaskStatus -TaskName "Limpiando registros de eventos de Windows" -Action { Clear-EventLogs }
+Write-TaskStatus -TaskName "Limpiando caché de descargas de Windows Update" -Action { Clear-SoftwareDistribution }
+Remove-Bloatware
+Optimize-GoogleChrome
+Optimize-Adobe
+Write-TaskStatus -TaskName "Limpiando drivers antiguos del sistema (puede tardar)" -Action { Clear-OldDrivers }
 
-Write-Host "`n[Paso 3: Optimización de Rendimiento]" -ForegroundColor Yellow
+Write-Host "`n[Paso 3: Optimización del Sistema y Red]" -ForegroundColor Yellow
 Write-TaskStatus -TaskName "Configurando DNS de Google (8.8.8.8, 8.8.4.4)" -Action { Set-GoogleDns }
 Write-TaskStatus -TaskName "Optimizando configuración de red" -Action { Set-NetworkOptimization }
+Write-TaskStatus -TaskName "Eliminando límite de ancho de banda reservable" -Action { Set-BandwidthLimit }
 Write-TaskStatus -TaskName "Limpiando caché de DNS" -Action { Flush-DnsCache }
 Write-TaskStatus -TaskName "Deshabilitando aplicaciones de inicio" -Action { Disable-StartupApps }
 Write-TaskStatus -TaskName "Desactivando telemetría y servicios en segundo plano" -Action { Optimize-BackgroundProcesses }
 Write-TaskStatus -TaskName "Desactivando servicio de precarga (SysMain/Superfetch)" -Action { Disable-SysMain }
 Write-TaskStatus -TaskName "Desactivando características de juego de Xbox" -Action { Disable-GamingFeatures }
-Write-TaskStatus -TaskName "Eliminando límite de ancho de banda reservable" -Action { Set-BandwidthLimit }
 Write-TaskStatus -TaskName "Ajustando efectos visuales para rendimiento" -Action { Disable-VisualEffects }
-Write-TaskStatus -TaskName "Optimizando unidades de disco (Defrag/TRIM)" -Action { Optimize-Drives }
 
-Write-Host "`n[Paso 4: Optimización de Aplicaciones]" -ForegroundColor Yellow
-Remove-Bloatware
-Optimize-GoogleChrome
-
-Write-Host "`n[Paso 5: Mantenimiento Profundo]" -ForegroundColor Yellow
-Write-TaskStatus -TaskName "Limpiando drivers antiguos del sistema (puede tardar)" -Action { Clear-OldDrivers }
+Write-Host "`n[Paso 4: Mantenimiento de Integridad y Discos]" -ForegroundColor Yellow
+Write-TaskStatus -TaskName "Optimizando unidades de disco (TRIM/Defrag)" -Action { Optimize-Drives }
 Write-TaskStatus -TaskName "Reparando archivos de sistema (SFC y DISM)" -Action { Repair-SystemFiles }
 
+Write-Host "`n[Paso 5: Finalización e Informe]" -ForegroundColor Yellow
 Get-DiskSpace
 
 Write-Host "`n==========================================" -ForegroundColor Green
