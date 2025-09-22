@@ -448,7 +448,7 @@ function Handle-SmartRestart {
         $respuesta = Read-Host -Prompt "El mantenimiento ha finalizado. ¿Deseas reiniciar ahora para aplicar todos los cambios? (s/n)"
     }
 
-    if ($ForzarReinicio.IsPresent -or $respuesta -eq 's') {
+    if ($ForzarReinicio.IsPresent -or $respuesta -match '^(s|y|si|yes)$') {
         Write-Host "`n========================================" -ForegroundColor Yellow
         Write-Host "REINICIO PROGRAMADO" -ForegroundColor Yellow
         Write-Host "========================================" -ForegroundColor Yellow
