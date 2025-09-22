@@ -1,7 +1,7 @@
 # ================================================================
 # Script de Mantenimiento y Optimización de Windows 10 y Windows 11
 # Autor: Antony Dapier
-# Versión: 8.0
+# Versión: 9.0
 # ================================================================
 
 # Requiere PowerShell 5.1 (incluido por defecto en Windows 10) para máxima compatibilidad.
@@ -16,9 +16,11 @@ param (
 # --- INICIO DE LA CONFIGURACIÓN DEL INFORME ---
 # Usar un método más robusto para encontrar el Escritorio, compatible con OneDrive.
 $desktopPath = [System.Environment]::GetFolderPath('Desktop')
-$informePath = Join-Path -Path $desktopPath -ChildPath "Informe_Optimizacion_$(Get-Date -Format 'yyyy-MM-dd_HH-mm-ss').txt"
+$informePath = Join-Path -Path $desktopPath -ChildPath "Informe de Optimización by Antony Dapier ($(Get-Date -Format 'yyyy-MM-dd_HH-mm-ss')).txt"
 try {
     Start-Transcript -Path $informePath -ErrorAction Stop
+    # Escribir la cabecera personalizada en el informe
+    Write-Output "Gracias por usar mi script, si llegas a tener algun problema puedes enviarme este mismo archivo. Saludos Antony Dapier`n"
 } catch {
     Write-Host "No se pudo crear el archivo de informe en '$($informePath)'. Verifique los permisos." -ForegroundColor Red
     exit
@@ -244,7 +246,8 @@ function Disable-GamingFeatures {
     Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\GameDVR" -Name "AppCaptureEnabled" -Value 0 -Force
     Set-ItemProperty -Path "HKCU:\Software\Microsoft\GameBar" -Name "UseGameBarOnlyInFullscreen" -Value 0 -Force
     Set-ItemProperty -Path "HKCU:\Software\Microsoft\GameBar" -Name "ShowStartupPanel" -Value 0 -Force
-    Get-Service -Name "XblAuthManager", "XblGameSave", "XboxGipSvc", "XboxNetApiSvc" -ErrorAction SilentlyContinue | Set-Service -StartupType Disabled -ErrorAction SilentlyContinue
+    $xboxServices = @("XblAuthManager", "XblGameSave", "XboxGipSvc", "XboxNetApiSvc")
+    Get-Service -Name $xboxServices -ErrorAction SilentlyContinue | Set-Service -StartupType Disabled -ErrorAction SilentlyContinue
 }
 
 function Set-BandwidthLimit {
@@ -292,7 +295,9 @@ function Optimize-GoogleChrome {
     $chromeProcesses = Get-Process -Name "chrome" -ErrorAction SilentlyContinue
     if ($chromeProcesses) {
         Stop-Process -Name "chrome" -Force -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 2 # Dar tiempo a que los procesos terminen
+        # Esperar a que los procesos se cierren para evitar archivos bloqueados
+        $chromeProcesses | Wait-Process -Timeout 10 -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 1 # Pequeña pausa adicional por si acaso
     }
 
     try {
@@ -300,9 +305,19 @@ function Optimize-GoogleChrome {
         # Limpiar perfiles (Default y Profile *)
         $profiles = Get-ChildItem -Path "$chromeUserData\Default", "$chromeUserData\Profile *" -Directory -ErrorAction SilentlyContinue
         foreach ($profile in $profiles) {
-            Remove-Item -Path "$($profile.FullName)\History" -Force -ErrorAction SilentlyContinue
-            Remove-Item -Recurse -Path "$($profile.FullName)\Cache" -Force -ErrorAction SilentlyContinue
-            Remove-Item -Recurse -Path "$($profile.FullName)\Code Cache" -Force -ErrorAction SilentlyContinue
+            # Lista ampliada de archivos y carpetas a eliminar para una limpieza más completa
+            $itemsAndFoldersToRemove = @(
+                # Archivos de historial y datos de navegación
+                "$($profile.FullName)\History", "$($profile.FullName)\Top Sites", "$($profile.FullName)\Visited Links", "$($profile.FullName)\Web Data",
+                # Carpetas de caché
+                "$($profile.FullName)\Cache", "$($profile.FullName)\Code Cache", "$($profile.FullName)\GPUCache", "$($profile.FullName)\Media Cache"
+            )
+            foreach ($item in $itemsAndFoldersToRemove) {
+                if (Test-Path $item) {
+                    # -Recurse es para carpetas, pero no daña la eliminación de archivos individuales.
+                    Remove-Item -Path $item -Recurse -Force -ErrorAction SilentlyContinue
+                }
+            }
         }
         Write-Host " [OK]" -ForegroundColor Green
     } catch {
@@ -343,13 +358,16 @@ function Optimize-Adobe {
 }
 
 function Optimize-BackgroundProcesses {
-    $serviciosADeshabilitar = @("DiagTrack", "dmwappushsvc", "WMPNetworkSvc", "RemoteRegistry", "RetailDemo", "diagnosticshub.standardcollector.service", "MapsBroker", "Fax")
-    Get-Service -Name $serviciosADeshabilitar -ErrorAction SilentlyContinue | ForEach-Object {
-        if ($_.Status -ne 'Stopped') {
-            $_ | Stop-Service -Force -ErrorAction SilentlyContinue
-        }
-        if ($_.StartType -ne 'Disabled') {
-            $_ | Set-Service -StartupType Disabled -ErrorAction SilentlyContinue
+    $serviciosADeshabilitar = @( "DiagTrack", "dmwappushsvc", "WMPNetworkSvc", "RemoteRegistry", "RetailDemo", "diagnosticshub.standardcollector.service", "MapsBroker", "Fax" )
+    foreach ($s in $serviciosADeshabilitar) {
+        $servicio = Get-Service -Name $s -ErrorAction SilentlyContinue
+        if ($servicio) {
+            if ($servicio.Status -ne 'Stopped') {
+                Stop-Service -Name $s -Force -ErrorAction SilentlyContinue
+            }
+            if ($servicio.StartType -ne 'Disabled') {
+                Set-Service -Name $s -StartupType Disabled -ErrorAction SilentlyContinue
+            }
         }
     }
     $tareasTelemetria = @( "\Microsoft\Windows\Application Experience\ProgramDataUpdater", "\Microsoft\Windows\Autochk\Proxy", "\Microsoft\Windows\Customer Experience Improvement Program\Consolidator", "\Microsoft\Windows\Customer Experience Improvement Program\KernelCeipTask", "\Microsoft\Windows\Customer Experience Improvement Program\UsbCeip", "\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticDataCollector" )
