@@ -9,7 +9,7 @@ Abre **PowerShell como administrador** y copia uno de los siguientes comando.
 
 ### **Mantenimiento Diario**  
 ```
-iex (iwr https://bit.ly/pc-mantenimiento-diario)
+iex (irm https://bit.ly/pc-mantenimiento-diario)
 ```
 
 ## **Explicación del script**  
