@@ -248,13 +248,6 @@ function Disable-GamingFeatures {
     Get-Service -Name $xboxServices -ErrorAction SilentlyContinue | Set-Service -StartupType Disabled -ErrorAction SilentlyContinue
 }
 
-function Set-BandwidthLimit {
-    # Habilita la política y establece el límite de ancho de banda reservable en 0%.
-    $regPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Psched"
-    if (-not (Test-Path $regPath)) { New-Item -Path $regPath -Force | Out-Null }
-    Set-ItemProperty -Path $regPath -Name "NonBestEffortLimit" -Value 0 -Type DWord -Force
-}
-
 function Optimize-GoogleChrome {
     Write-Host "`n  -> Optimizando Google Chrome..."
     $chromeExePath = "$env:ProgramFiles\Google\Chrome\Application\chrome.exe"
@@ -345,15 +338,12 @@ function Optimize-Adobe {
 
 function Optimize-BackgroundProcesses {
     $serviciosADeshabilitar = @( "DiagTrack", "dmwappushsvc", "WMPNetworkSvc", "RemoteRegistry", "RetailDemo", "diagnosticshub.standardcollector.service", "MapsBroker", "Fax" )
-    foreach ($s in $serviciosADeshabilitar) {
-        $servicio = Get-Service -Name $s -ErrorAction SilentlyContinue
-        if ($servicio) {
-            if ($servicio.Status -ne 'Stopped') {
-                Stop-Service -Name $s -Force -ErrorAction SilentlyContinue
-            }
-            if ($servicio.StartType -ne 'Disabled') {
-                Set-Service -Name $s -StartupType Disabled -ErrorAction SilentlyContinue
-            }
+    Get-Service -Name $serviciosADeshabilitar -ErrorAction SilentlyContinue | ForEach-Object {
+        if ($_.Status -ne 'Stopped') {
+            $_ | Stop-Service -Force -ErrorAction SilentlyContinue
+        }
+        if ($_.StartType -ne 'Disabled') {
+            $_ | Set-Service -StartupType Disabled -ErrorAction SilentlyContinue
         }
     }
     $tareasTelemetria = @( "\Microsoft\Windows\Application Experience\ProgramDataUpdater", "\Microsoft\Windows\Autochk\Proxy", "\Microsoft\Windows\Customer Experience Improvement Program\Consolidator", "\Microsoft\Windows\Customer Experience Improvement Program\KernelCeipTask", "\Microsoft\Windows\Customer Experience Improvement Program\UsbCeip", "\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticDataCollector" )
