@@ -11,11 +11,13 @@ param (
 )
 
 # --- INICIO DE LA CONFIGURACIÓN DEL INFORME ---
-$informePath = "$env:USERPROFILE\Desktop\Informe_Optimizacion_$(Get-Date -Format 'yyyy-MM-dd_HH-mm-ss').txt"
+# Usar un método más robusto para encontrar el Escritorio, compatible con OneDrive.
+$desktopPath = [System.Environment]::GetFolderPath('Desktop')
+$informePath = Join-Path -Path $desktopPath -ChildPath "Informe_Optimizacion_$(Get-Date -Format 'yyyy-MM-dd_HH-mm-ss').txt"
 try {
     Start-Transcript -Path $informePath -ErrorAction Stop
 } catch {
-    Write-Host "No se pudo crear el archivo de informe en el Escritorio. Verifique los permisos." -ForegroundColor Red
+    Write-Host "No se pudo crear el archivo de informe en '$($informePath)'. Verifique los permisos." -ForegroundColor Red
     exit
 }
 
@@ -96,7 +98,9 @@ function Clear-SoftwareDistribution {
 function Clear-EventLogs {
     $logs = Get-WinEvent -ListLog * -ErrorAction SilentlyContinue
     foreach ($log in $logs) {
-        wevtutil.exe cl $log.LogName | Out-Null
+        # Se redirige la salida de error a $null para evitar que un fallo en un solo log (p. ej. por permisos de "Acceso denegado")
+        # haga que toda la tarea de "Write-TaskStatus" se marque como fallida.
+        wevtutil.exe cl $log.LogName 2>$null
     }
 }
 
@@ -394,16 +398,28 @@ function Repair-SystemFiles {
 }
 
 function Optimize-Drives {
-    $volumes = Get-Volume | Where-Object { $_.DriveType -eq 'Fixed' -and $_.FileSystem -ne 'RAW' -and $_.HealthStatus -eq 'Healthy' }
-    if ($null -eq $volumes) {
-        Write-Host "`n     -> No se encontraron unidades aptas para optimizar." -ForegroundColor Yellow
+    $allFixedVolumes = Get-Volume | Where-Object { $_.DriveType -eq 'Fixed' }
+    $volumesToOptimize = $allFixedVolumes | Where-Object { $_.FileSystem -ne 'RAW' -and $_.HealthStatus -eq 'Healthy' }
+
+    if ($null -eq $volumesToOptimize) {
+        Write-Host "`n     -> No se encontraron unidades aptas para optimizar (Unidades fijas, con formato y en buen estado)." -ForegroundColor Yellow
         return
     }
-    foreach ($volume in $volumes) {
+
+    # Informar sobre unidades omitidas para mayor claridad
+    $skippedVolumes = Compare-Object -ReferenceObject $allFixedVolumes -DifferenceObject $volumesToOptimize -PassThru | Where-Object { $_.SideIndicator -eq '<=' }
+    if ($null -ne $skippedVolumes) {
+        foreach ($skipped in $skippedVolumes) {
+            $reason = if ($skipped.FileSystem -eq 'RAW') { "Sistema de archivos RAW" } elseif ($skipped.HealthStatus -ne 'Healthy') { "Estado no es 'Saludable' ($($skipped.HealthStatus))" } else { "Razón desconocida" }
+            Write-Host "`n     -> Omitiendo Unidad $($skipped.DriveLetter): ($reason)." -ForegroundColor Gray
+        }
+    }
+
+    foreach ($volume in $volumesToOptimize) {
         Write-Host "`n     -> Optimizando Unidad $($volume.DriveLetter):..." -ForegroundColor Gray -NoNewline
         # Optimize-Volume es inteligente: aplica TRIM en SSDs y Defrag en HDDs.
         # Usamos -Verbose para capturar la salida detallada.
-        $result = Optimize-Volume -DriveLetter $volume.DriveLetter -Verbose 4>&1
+        $result = Optimize-Volume -DriveLetter $volume.DriveLetter -Verbose 4>&1 | Out-String
         if ($LASTEXITCODE -eq 0 -and $? -eq $true) {
             $optimizationType = if ($result -like "*TRIM*") { "TRIM" } elseif ($result -like "*defragment*") { "Defragmentación" } else { "Optimización" }
             Write-Host " [$optimizationType completada]" -ForegroundColor Green
