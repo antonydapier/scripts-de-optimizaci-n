@@ -244,7 +244,8 @@ function Disable-GamingFeatures {
     Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\GameDVR" -Name "AppCaptureEnabled" -Value 0 -Force
     Set-ItemProperty -Path "HKCU:\Software\Microsoft\GameBar" -Name "UseGameBarOnlyInFullscreen" -Value 0 -Force
     Set-ItemProperty -Path "HKCU:\Software\Microsoft\GameBar" -Name "ShowStartupPanel" -Value 0 -Force
-    Get-Service -Name "XblAuthManager", "XblGameSave", "XboxGipSvc", "XboxNetApiSvc" -ErrorAction SilentlyContinue | Set-Service -StartupType Disabled -ErrorAction SilentlyContinue
+    $xboxServices = @("XblAuthManager", "XblGameSave", "XboxGipSvc", "XboxNetApiSvc")
+    Get-Service -Name $xboxServices -ErrorAction SilentlyContinue | Set-Service -StartupType Disabled -ErrorAction SilentlyContinue
 }
 
 function Set-BandwidthLimit {
@@ -343,13 +344,16 @@ function Optimize-Adobe {
 }
 
 function Optimize-BackgroundProcesses {
-    $serviciosADeshabilitar = @("DiagTrack", "dmwappushsvc", "WMPNetworkSvc", "RemoteRegistry", "RetailDemo", "diagnosticshub.standardcollector.service", "MapsBroker", "Fax")
-    Get-Service -Name $serviciosADeshabilitar -ErrorAction SilentlyContinue | ForEach-Object {
-        if ($_.Status -ne 'Stopped') {
-            $_ | Stop-Service -Force -ErrorAction SilentlyContinue
-        }
-        if ($_.StartType -ne 'Disabled') {
-            $_ | Set-Service -StartupType Disabled -ErrorAction SilentlyContinue
+    $serviciosADeshabilitar = @( "DiagTrack", "dmwappushsvc", "WMPNetworkSvc", "RemoteRegistry", "RetailDemo", "diagnosticshub.standardcollector.service", "MapsBroker", "Fax" )
+    foreach ($s in $serviciosADeshabilitar) {
+        $servicio = Get-Service -Name $s -ErrorAction SilentlyContinue
+        if ($servicio) {
+            if ($servicio.Status -ne 'Stopped') {
+                Stop-Service -Name $s -Force -ErrorAction SilentlyContinue
+            }
+            if ($servicio.StartType -ne 'Disabled') {
+                Set-Service -Name $s -StartupType Disabled -ErrorAction SilentlyContinue
+            }
         }
     }
     $tareasTelemetria = @( "\Microsoft\Windows\Application Experience\ProgramDataUpdater", "\Microsoft\Windows\Autochk\Proxy", "\Microsoft\Windows\Customer Experience Improvement Program\Consolidator", "\Microsoft\Windows\Customer Experience Improvement Program\KernelCeipTask", "\Microsoft\Windows\Customer Experience Improvement Program\UsbCeip", "\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticDataCollector" )
@@ -366,13 +370,9 @@ function Optimize-BackgroundProcesses {
 
 function Disable-SysMain {
     $servicio = Get-Service -Name "SysMain" -ErrorAction SilentlyContinue
-    if ($servicio) {
-        if ($servicio.Status -ne 'Stopped') {
-            Stop-Service -Name "SysMain" -Force -ErrorAction SilentlyContinue
-        }
-        if ($servicio.StartType -ne 'Disabled') {
-            Set-Service -Name "SysMain" -StartupType Disabled -ErrorAction SilentlyContinue
-        }
+    if ($servicio) { # Si el servicio existe
+        # Lo detiene si está en ejecución y luego establece su tipo de inicio en Deshabilitado.
+        $servicio | Stop-Service -Force -PassThru -ErrorAction SilentlyContinue | Set-Service -StartupType Disabled -ErrorAction SilentlyContinue
     }
 }
 
