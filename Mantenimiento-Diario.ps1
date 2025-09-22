@@ -349,7 +349,7 @@ function Optimize-BackgroundProcesses {
     $serviciosADeshabilitar = @( "DiagTrack", "dmwappushsvc", "WMPNetworkSvc", "RemoteRegistry", "RetailDemo", "diagnosticshub.standardcollector.service", "MapsBroker", "Fax" )
     foreach ($s in $serviciosADeshabilitar) {
         $servicio = Get-Service -Name $s -ErrorAction SilentlyContinue
-        if ($null -ne $servicio) {
+        if ($servicio) {
             if ($servicio.Status -ne 'Stopped') {
                 Stop-Service -Name $s -Force -ErrorAction SilentlyContinue
             }
@@ -361,7 +361,7 @@ function Optimize-BackgroundProcesses {
     $tareasTelemetria = @( "\Microsoft\Windows\Application Experience\ProgramDataUpdater", "\Microsoft\Windows\Autochk\Proxy", "\Microsoft\Windows\Customer Experience Improvement Program\Consolidator", "\Microsoft\Windows\Customer Experience Improvement Program\KernelCeipTask", "\Microsoft\Windows\Customer Experience Improvement Program\UsbCeip", "\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticDataCollector" )
     foreach ($t in $tareasTelemetria) {
         $task = Get-ScheduledTask -TaskPath $t -ErrorAction SilentlyContinue
-        if ($null -ne $task -and $task.State -ne 'Disabled') {
+        if ($task -and $task.State -ne 'Disabled') {
             $task | Disable-ScheduledTask -ErrorAction SilentlyContinue
         }
     }
@@ -372,7 +372,7 @@ function Optimize-BackgroundProcesses {
 
 function Disable-SysMain {
     $servicio = Get-Service -Name "SysMain" -ErrorAction SilentlyContinue
-    if ($null -ne $servicio) {
+    if ($servicio) {
         if ($servicio.Status -ne 'Stopped') {
             Stop-Service -Name "SysMain" -Force -ErrorAction SilentlyContinue
         }
