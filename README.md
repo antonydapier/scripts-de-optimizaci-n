@@ -1,13 +1,6 @@
-Buu👻 Hola Esto es un Trabajo de varios años,
-creado por la necesidad de mantener en buen funcionamiento mis maquinas apra tarbajar,
-lo más importante es el enfoque especifico para Diseñadores.
-basado en mi experiencia personal y en un uso dìario en el diseño,
-Lo comprato con ustedes esperando les sea de útilidad.
----
 # Scripts de Optimización para Windows 10 y Windows 11 (Enfoque en Diseñadores)
 
-Este repositorio contiene dos scripts
-diseñados para mejorar el rendimiento de Windows 10 y windwos 11 cualquier versión
+diseñado para mejorar el rendimiento de Windows 10 y windwos 11 cualquier versión
 sin afectar **impresoras, plotters, programas de diseño como Adobe Photoshop e Illustrator, asistencia remota (AnyDesk) y sistemas de transferencia de archivos (Resilio Sync) etc.  
 
 ## **Cómo usar los scripts**  
@@ -18,7 +11,6 @@ Abre **PowerShell como administrador** y copia uno de los siguientes comando.
 ```
 iex (iwr https://bit.ly/pc-mantenimiento-diario)
 ```
-
 
 ## **Explicación del script**  
 
