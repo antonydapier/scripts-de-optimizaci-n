@@ -245,7 +245,16 @@ function Disable-GamingFeatures {
     Set-ItemProperty -Path "HKCU:\Software\Microsoft\GameBar" -Name "UseGameBarOnlyInFullscreen" -Value 0 -Force
     Set-ItemProperty -Path "HKCU:\Software\Microsoft\GameBar" -Name "ShowStartupPanel" -Value 0 -Force
     $xboxServices = @("XblAuthManager", "XblGameSave", "XboxGipSvc", "XboxNetApiSvc")
-    Get-Service -Name $xboxServices -ErrorAction SilentlyContinue | Set-Service -StartupType Disabled -ErrorAction SilentlyContinue
+    foreach ($service in $xboxServices) {
+        if (Get-Service -Name $service -ErrorAction SilentlyContinue) { Set-Service -Name $service -StartupType Disabled -ErrorAction SilentlyContinue }
+    }
+}
+
+function Set-BandwidthLimit {
+    # Habilita la política y establece el límite de ancho de banda reservable en 0%.
+    $regPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Psched"
+    if (-not (Test-Path $regPath)) { New-Item -Path $regPath -Force | Out-Null }
+    Set-ItemProperty -Path $regPath -Name "NonBestEffortLimit" -Value 0 -Type DWord -Force
 }
 
 function Optimize-GoogleChrome {
@@ -337,7 +346,7 @@ function Optimize-Adobe {
 }
 
 function Optimize-BackgroundProcesses {
-    $serviciosADeshabilitar = @( "DiagTrack", "dmwappushsvc", "WMPNetworkSvc", "RemoteRegistry", "RetailDemo", "diagnosticshub.standardcollector.service", "MapsBroker", "Fax" )
+    $serviciosADeshabilitar = @("DiagTrack", "dmwappushsvc", "WMPNetworkSvc", "RemoteRegistry", "RetailDemo", "diagnosticshub.standardcollector.service", "MapsBroker", "Fax")
     Get-Service -Name $serviciosADeshabilitar -ErrorAction SilentlyContinue | ForEach-Object {
         if ($_.Status -ne 'Stopped') {
             $_ | Stop-Service -Force -ErrorAction SilentlyContinue
