@@ -33,7 +33,7 @@ function Write-TaskStatus {
         [Parameter(Mandatory=$true)]
         [string]$TaskName,
 
-        [Parameter(Mandary=$true)]
+        [Parameter(Mandatory=$true)]
         [scriptblock]$Action
     )
     Write-Host -NoNewline "  -> $TaskName..."
@@ -199,7 +199,7 @@ function Remove-Bloatware {
 }
 
 function Disable-StartupApps {
-    $startupExclusions = @("security", "antivirus", "defender", "nvidia", "amd", "intel", "audio", "realtek", "synaptics", "onedrive", "dropbox", "bootcamp")
+    $startupExclusions = @("security", "antivirus", "defender", "nvidia", "amd", "intel", "audio", "realtek", "synaptics", "onedrive", "dropbox", "bootcamp", "obs")
     $runKeys = @("HKCU:\Software\Microsoft\Windows\CurrentVersion\Run", "HKLM:\Software\Microsoft\Windows\CurrentVersion\Run")
 
     foreach ($key in $runKeys) {
@@ -284,8 +284,7 @@ function Optimize-GoogleChrome {
     try {
         $chromeUserData = "$env:LOCALAPPDATA\Google\Chrome\User Data"
         # Limpiar perfiles (Default y Profile *)
-        $profiles = Get-ChildItem -Path $chromeUserData -Directory -Filter "Default"
-        $profiles += Get-ChildItem -Path $chromeUserData -Directory -Filter "Profile *"
+        $profiles = Get-ChildItem -Path "$chromeUserData\Default", "$chromeUserData\Profile *" -Directory -ErrorAction SilentlyContinue
         foreach ($profile in $profiles) {
             Remove-Item -Path "$($profile.FullName)\History" -Force -ErrorAction SilentlyContinue
             Remove-Item -Recurse -Path "$($profile.FullName)\Cache" -Force -ErrorAction SilentlyContinue
