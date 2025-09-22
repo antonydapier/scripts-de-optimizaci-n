@@ -123,7 +123,7 @@ function Set-GoogleDns {
     # Obtener los adaptadores de red activos (Ethernet, Wi-Fi) que usan IPv4
     $networkAdapters = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' -and ($_.MediaType -eq '802.3' -or $_.MediaType -eq 'Native 802.11') }
     
-    if ($null -eq $networkAdapters -or $networkAdapters.Count -eq 0) {
+    if (-not $networkAdapters) {
         throw "No se encontraron adaptadores de red activos (Ethernet o Wi-Fi)."
     }
 
