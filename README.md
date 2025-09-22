@@ -4,20 +4,15 @@ lo más importante es el enfoque especifico para Diseñadores.
 basado en mi experiencia personal y en un uso dìario en el diseño,
 Lo comprato con ustedes esperando les sea de útilidad.
 ---
-# Scripts de Optimización para Windows (Enfoque en Diseñadores)
+# Scripts de Optimización para Windows 10 y Windows 11 (Enfoque en Diseñadores)
 
 Este repositorio contiene dos scripts
-diseñados para mejorar el rendimiento de Windows 10 cualquier versión
-sin afectar **impresoras, plotters, programas de diseño como Adobe Photoshop e Illustrator, asistencia remota (AnyDesk) y sistemas de transferencia de archivos (Resilio Sync)**.  
+diseñados para mejorar el rendimiento de Windows 10 y windwos 11 cualquier versión
+sin afectar **impresoras, plotters, programas de diseño como Adobe Photoshop e Illustrator, asistencia remota (AnyDesk) y sistemas de transferencia de archivos (Resilio Sync) etc.  
 
 ## **Cómo usar los scripts**  
 
-Abre **PowerShell como administrador** y copia uno de los siguientes comandos según el script que quieras ejecutar.  
-
-### **Optimización del sistema*  
-```
-iex (iwr https://bit.ly/optimizar-pc)
-```
+Abre **PowerShell como administrador** y copia uno de los siguientes comando.  
 
 ### **Mantenimiento Diario**  
 ```
@@ -25,38 +20,66 @@ iex (iwr https://bit.ly/pc-mantenimiento-diario)
 ```
 
 
-## **Explicación de los scripts**  
-
-### 🛠 **Optimizar-PC.ps1**  
-Realiza una optimización enfocada en mejorar el rendimiento del sistema sin afectar software de diseño ni servicios esenciales.  
-
-### **Mantenimiento-Diario.ps1**  
-Resumen de Acciones del Script de Optimización
-Este script está diseñado para mejorar el rendimiento general de Windows eliminando archivos innecesarios y desactivando funciones que consumen recursos en segundo plano, sin interferir con tu flujo de trabajo creativo.
+## **Explicación del script**  
 
 ✅ Lo que el script SÍ HACE:
-Limpieza Profunda de Archivos Basura:
 
-Elimina archivos temporales de Windows y de tu perfil de usuario.
-Vacia la Papelera de Reciclaje de todas las unidades.
-Limpia el almacén de drivers antiguos (DriverStore), liberando gigabytes de espacio ocupado por controladores de dispositivos que ya no usas (como versiones viejas de drivers de ratones, teclados, etc.).
-Optimización del Sistema y Rendimiento:
+Preparación Inicial
 
-Desactiva SysMain (Superfetch): Previene el uso excesivo del disco duro, un problema común que ralentiza el PC, especialmente en equipos con discos mecánicos (HDD).
-Desactiva la Telemetría de Microsoft: Reduce la cantidad de datos que Windows envía a Microsoft en segundo plano, liberando CPU y ancho de banda.
-Deshabilita Servicios en Segundo Plano no Esenciales: Detiene servicios como el "Registro Remoto" o el "Servicio de Fax", que la mayoría de los usuarios no necesita y consumen memoria.
-Ajusta Efectos Visuales: Configura Windows para priorizar el rendimiento sobre las animaciones y transparencias de la interfaz.
-Eliminación de "Bloatware" (Software Preinstalado):
+Verifica que se está ejecutando con permisos de Administrador.
+Muestra una advertencia y una cuenta regresiva de 10 segundos para que el usuario pueda cancelar.
+Inicia la creación de un informe de texto (.txt) en el Escritorio con todas las acciones.
 
-Desinstala únicamente las aplicaciones preinstaladas de Microsoft que no son esenciales, como Candy Crush, 3D Viewer, Xbox Game Bar y otras apps de la Tienda Windows que vienen con el sistema.
-Mantenimiento del Sistema de Archivos:
+Paso 1: Verificaciones
 
-Repara Archivos de Sistema: Ejecuta las herramientas SFC /scannow y DISM para verificar y corregir la integridad de los archivos de Windows, previniendo errores y cuelgues.
-Optimiza las Unidades de Disco: Ejecuta el desfragmentador en discos HDD y el comando TRIM en unidades SSD para mantener la velocidad de lectura/escritura.
-Optimización de Red (Básica y Segura):
+Comprueba que haya una conexión a Internet activa para asegurar que todas las tareas funcionen.
 
-Limpia la caché de DNS para resolver posibles problemas de conexión a sitios web.
-Ajusta el número de conexiones simultáneas para mejorar ligeramente la velocidad de navegación.
+Paso 2: Limpieza Profunda del Sistema
+
+Archivos Temporales: Elimina los archivos temporales del usuario y del sistema.
+Papelera de Reciclaje: Vacía la Papelera de Reciclaje de todas las unidades.
+Registros de Windows: Limpia todos los registros de eventos del sistema para liberar espacio.
+Caché de Windows Update: Vacía la carpeta de descargas de Windows Update (SoftwareDistribution).
+
+Bloatware:
+Crea un punto de restauración del sistema por seguridad.
+Desinstala aplicaciones preinstaladas no deseadas (la lista varía para Windows 10 y 11).
+
+Google Chrome:
+Cierra el navegador.
+Activa la "Aceleración por hardware" y el "Ahorro de memoria".
+Desactiva la ejecución de aplicaciones en segundo plano.
+Limpia el historial y la caché.
+
+Aplicaciones de Adobe:
+Cierra los programas de Adobe (Photoshop, Premiere, etc.).
+Limpia las carpetas de caché de medios (Media Cache).
+Drivers Antiguos: Elimina los paquetes de controladores de dispositivos que ya no están en uso.
+
+Paso 3: Optimización del Sistema y Red
+DNS: Configura los servidores DNS de Google (8.8.8.8, 8.8.4.4) para una navegación potencialmente más rápida.
+Conexiones de Red: Aumenta el número de conexiones simultáneas que Windows puede hacer a un servidor.
+Ancho de Banda: Elimina el límite del 20% de ancho de banda que Windows reserva para sus propias tareas.
+Caché de DNS: Limpia la caché de resolución de nombres de dominio.
+Aplicaciones de Inicio: Deshabilita programas no esenciales para que no se inicien con Windows.
+Telemetría: Desactiva servicios y tareas programadas de Windows que recopilan datos de uso.
+SysMain (Superfetch): Deshabilita el servicio de precarga para reducir el uso del disco.
+Funciones de Juego: Desactiva la Barra de Juegos de Xbox y sus servicios asociados.
+Efectos Visuales: Configura la apariencia de Windows para "Mejor rendimiento", pero mantiene el suavizado de fuentes y las miniaturas de iconos para un balance ideal.
+
+Paso 4: Mantenimiento de Integridad y Discos
+Optimización de Discos:
+Ejecuta TRIM en las unidades de estado sólido (SSD) para mantener su rendimiento.
+Ejecuta la desfragmentación en los discos duros mecánicos (HDD).
+Reparación de Archivos de Sistema:
+Limpia componentes antiguos de Windows Update (DISM /StartComponentCleanup).
+Escanea y repara archivos corruptos del sistema (SFC /scannow).
+Repara la imagen del sistema operativo (DISM /RestoreHealth).
+Paso 5: Finalización
+
+Muestra un informe final del espacio libre en disco.
+Guarda el informe detallado en el Escritorio.
+Pregunta al usuario si desea reiniciar el equipo para aplicar todos los cambios.
 
 ❌ Lo que el script NO HACE (Garantías para Diseñadores):
 NO desinstala tus programas de diseño:
@@ -72,23 +95,14 @@ Servicios como OneDrive, Dropbox, Google Drive, WeTransfer, Resilio Sync, o AnyD
 NO borra tus archivos de trabajo ni datos personales:
 
 El script NO toca las carpetas de Documentos, Imágenes, Música, Videos ni el Escritorio.
-Como solicitaste, la función de borrar la carpeta de Descargas fue eliminada, por lo que tus archivos descargados están completamente a salvo.
 En resumen, puedes ver este script como un técnico de mantenimiento que hace una puesta a punto del "motor" de tu Windows sin reorganizar ni tocar nada de tu "taller" creativo.
-
 ---
 
 ## **Requisitos**  
 - PowerShell debe estar habilitado.  
-- Ejecutar como **Administrador** para un funcionamiento correcto.  
+- Ejecutar como **Administrador** para un funcionamiento correcto.
+- Copia u pega y ejecuta. 
 
-🚀 **Listo! Ahora puedes optimizar y mantener tu sistema sin preocupaciones.**  
-
----
-
-**INSTRUCCIONES:**  
-1. **Copia todo este texto.**  
-2. **Ve a tu repositorio en GitHub.**  
-3. **Edita o crea el archivo `README.md`.**  
-4. **Pega el contenido y guarda los cambios.**  
+🚀 **Listo! Ahora puedes optimizar y mantener tu sistema sin preocupaciones.**   
 
 ✅ ¡Así de fácil! es ejecutar los scripts con un solo comando en Powershell. 🚀😃
