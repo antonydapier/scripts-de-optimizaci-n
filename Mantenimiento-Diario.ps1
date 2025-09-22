@@ -291,13 +291,12 @@ function Optimize-GoogleChrome {
     }
 
     # --- Limpieza de Datos de Navegación ---
-    Write-Host -NoNewline "    -> Limpiando datos de navegación (cerrando Chrome)..."
+    Write-Host -NoNewline "    -> Limpiando datos de navegación (cerrando Chrome a la fuerza)..."
     $chromeProcesses = Get-Process -Name "chrome" -ErrorAction SilentlyContinue
     if ($chromeProcesses) {
-        Stop-Process -Name "chrome" -Force -ErrorAction SilentlyContinue
-        # Esperar a que los procesos se cierren para evitar archivos bloqueados
-        $chromeProcesses | Wait-Process -Timeout 10 -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 1 # Pequeña pausa adicional por si acaso
+        # Se usa taskkill para un cierre más robusto que incluye procesos hijos y en segundo plano.
+        taskkill.exe /F /IM chrome.exe /T | Out-Null
+        Start-Sleep -Seconds 2 # Dar tiempo al sistema para que libere los archivos bloqueados.
     }
 
     try {
@@ -305,12 +304,15 @@ function Optimize-GoogleChrome {
         # Limpiar perfiles (Default y Profile *)
         $profiles = Get-ChildItem -Path "$chromeUserData\Default", "$chromeUserData\Profile *" -Directory -ErrorAction SilentlyContinue
         foreach ($profile in $profiles) {
-            # Lista ampliada de archivos y carpetas a eliminar para una limpieza más completa
+            # Lista aún más ampliada, incluyendo archivos temporales de bases de datos (.db-journal) y datos de sesión.
             $itemsAndFoldersToRemove = @(
-                # Archivos de historial y datos de navegación
-                "$($profile.FullName)\History", "$($profile.FullName)\Top Sites", "$($profile.FullName)\Visited Links", "$($profile.FullName)\Web Data",
-                # Carpetas de caché
-                "$($profile.FullName)\Cache", "$($profile.FullName)\Code Cache", "$($profile.FullName)\GPUCache", "$($profile.FullName)\Media Cache"
+                # Archivos de base de datos y sus journals
+                "$($profile.FullName)\History", "$($profile.FullName)\History-journal",
+                "$($profile.FullName)\Top Sites", "$($profile.FullName)\Top Sites-journal",
+                "$($profile.FullName)\Visited Links", "$($profile.FullName)\Visited Links-journal",
+                "$($profile.FullName)\Web Data", "$($profile.FullName)\Web Data-journal",
+                # Carpetas de caché y sesión
+                "$($profile.FullName)\Cache", "$($profile.FullName)\Code Cache", "$($profile.FullName)\GPUCache", "$($profile.FullName)\Media Cache", "$($profile.FullName)\Session Storage"
             )
             foreach ($item in $itemsAndFoldersToRemove) {
                 if (Test-Path $item) {
@@ -320,6 +322,7 @@ function Optimize-GoogleChrome {
             }
         }
         Write-Host " [OK]" -ForegroundColor Green
+        Write-Host "       NOTA: Si tienes la sesión iniciada en Chrome, parte del historial podría restaurarse desde la nube." -ForegroundColor Gray
     } catch {
         Write-Host " [FALLÓ]" -ForegroundColor Red
         Log-Error "No se pudieron eliminar algunos archivos de datos de Chrome. Error: $($_.Exception.Message)"
