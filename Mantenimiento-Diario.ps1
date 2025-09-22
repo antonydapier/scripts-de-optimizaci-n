@@ -206,6 +206,9 @@ function Remove-Bloatware {
 }
 
 function Disable-StartupApps {
+    # NOTA: Esta función mueve las entradas de inicio a una clave de respaldo llamada "..._DisabledByScript".
+    # Para revertir los cambios, se deben mover manualmente las entradas desde la clave de respaldo
+    # de vuelta a la clave "Run" original usando el Editor del Registro (regedit.exe).
     $startupExclusions = @("security", "antivirus", "defender", "nvidia", "amd", "intel", "audio", "realtek", "synaptics", "onedrive", "dropbox", "bootcamp", "obs")
     $runKeys = @("HKCU:\Software\Microsoft\Windows\CurrentVersion\Run", "HKLM:\Software\Microsoft\Windows\CurrentVersion\Run")
 
