@@ -78,6 +78,28 @@ function Clear-RecycleBinAllDrives {
     Clear-RecycleBin -Force -ErrorAction SilentlyContinue
 }
 
+function Clear-SoftwareDistribution {
+    # Detener el servicio de Windows Update para liberar los archivos
+    Stop-Service -Name wuauserv -Force -ErrorAction SilentlyContinue
+    # Esperar un momento para que el servicio se detenga completamente
+    Start-Sleep -Seconds 3
+
+    $path = "C:\Windows\SoftwareDistribution\Download"
+    if (Test-Path $path) {
+        Get-ChildItem -Path $path -Recurse -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    # Reiniciar el servicio de Windows Update
+    Start-Service -Name wuauserv -ErrorAction SilentlyContinue
+}
+
+function Clear-EventLogs {
+    $logs = Get-WinEvent -ListLog * -ErrorAction SilentlyContinue
+    foreach ($log in $logs) {
+        wevtutil.exe cl $log.LogName | Out-Null
+    }
+}
+
 function Get-DiskSpace {
     Write-Host "`nEspacio en disco disponible:" -ForegroundColor Yellow
     Get-PSDrive -PSProvider FileSystem | ForEach-Object {
@@ -453,6 +475,8 @@ Write-TaskStatus -TaskName "Verificando conexión a Internet" -Action { Test-Int
 Write-Host "`n[Paso 2: Limpieza Profunda del Sistema]" -ForegroundColor Yellow
 Write-TaskStatus -TaskName "Limpiando archivos temporales" -Action { Clear-TemporaryFiles }
 Write-TaskStatus -TaskName "Vaciando la Papelera de Reciclaje" -Action { Clear-RecycleBinAllDrives }
+Write-TaskStatus -TaskName "Limpiando registros de eventos de Windows" -Action { Clear-EventLogs }
+Write-TaskStatus -TaskName "Limpiando caché de descargas de Windows Update" -Action { Clear-SoftwareDistribution }
 Remove-Bloatware
 Optimize-GoogleChrome
 Optimize-Adobe
