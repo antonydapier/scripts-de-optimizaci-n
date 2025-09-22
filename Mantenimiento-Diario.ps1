@@ -9,8 +9,8 @@
 
 [CmdletBinding(SupportsShouldProcess=$true)]
 param (
-    # Fuerza el reinicio automático al finalizar sin preguntar.
-    [switch]$ForzarReinicio
+    # Evita el reinicio automático al finalizar el script.
+    [switch]$NoReiniciar
 )
 
 # --- INICIO DE LA CONFIGURACIÓN DEL INFORME ---
@@ -450,30 +450,26 @@ function Optimize-Drives {
 }
 
 function Handle-SmartRestart {
-    $respuesta = "n"
-    if (-not $ForzarReinicio.IsPresent) {
-        Write-Host "`n"
-        $respuesta = Read-Host -Prompt "El mantenimiento ha finalizado. ¿Deseas reiniciar ahora para aplicar todos los cambios? (s/n)"
+    if ($NoReiniciar.IsPresent) {
+        Write-Host "`nReinicio automático omitido por el usuario. Recuerda reiniciar manualmente para aplicar todos los cambios." -ForegroundColor Cyan
+        return
     }
 
-    if ($ForzarReinicio.IsPresent -or $respuesta -match '^(s|y|si|yes)$') {
-        Write-Host "`n========================================" -ForegroundColor Yellow
-        Write-Host "REINICIO PROGRAMADO" -ForegroundColor Yellow
-        Write-Host "========================================" -ForegroundColor Yellow
-        Write-Host "El equipo se reiniciará para aplicar todos los cambios." -ForegroundColor Green
-        
-        try {
-            for ($i = 10; $i -ge 1; $i--) {
-                Write-Host -NoNewline "`rReiniciando en $i segundos... Presiona CTRL+C para cancelar. "
-                Start-Sleep -Seconds 1
-            }
-            Write-Host "`n¡Reiniciando ahora!" -ForegroundColor Green
-            Shutdown.exe /r /f /t 0
-        } catch {
-            Write-Host "`nReinicio cancelado por el usuario." -ForegroundColor Red
+    # Si no se usó -NoReiniciar, proceder con el reinicio automático.
+    Write-Host "`n========================================" -ForegroundColor Yellow
+    Write-Host "REINICIO AUTOMÁTICO PROGRAMADO" -ForegroundColor Yellow
+    Write-Host "========================================" -ForegroundColor Yellow
+    Write-Host "El mantenimiento ha finalizado. El equipo se reiniciará para aplicar todos los cambios." -ForegroundColor Green
+    
+    try {
+        for ($i = 15; $i -ge 1; $i--) {
+            Write-Host -NoNewline "`rReiniciando en $i segundos... Presiona CTRL+C para cancelar. "
+            Start-Sleep -Seconds 1
         }
-    } else {
-        Write-Host "`nReinicio omitido. Recuerda reiniciar manualmente para aplicar todos los cambios." -ForegroundColor Cyan
+        Write-Host "`n¡Reiniciando ahora!" -ForegroundColor Green
+        Shutdown.exe /r /f /t 0
+    } catch {
+        Write-Host "`nReinicio cancelado por el usuario." -ForegroundColor Red
     }
 }
 
@@ -487,6 +483,7 @@ Confirm-IsAdmin
 Write-Host "`n=======================================================================" -ForegroundColor Yellow
 Write-Host "  ADVERTENCIA: Este script cerrará programas y modificará el sistema." -ForegroundColor Yellow
 Write-Host "  Por favor, GUARDE TODO SU TRABAJO y CIERRE TODAS LAS APLICACIONES." -ForegroundColor Yellow
+Write-Host "  AL FINALIZAR, EL EQUIPO SE REINICIARÁ AUTOMÁTICAMENTE." -ForegroundColor Red
 Write-Host "=======================================================================" -ForegroundColor Yellow
 try {
     for ($i = 10; $i -ge 1; $i--) {
