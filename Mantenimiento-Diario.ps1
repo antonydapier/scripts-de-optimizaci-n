@@ -4,6 +4,9 @@
 # Versión: 8.0
 # ================================================================
 
+# Requiere PowerShell 5.1 (incluido por defecto en Windows 10) para máxima compatibilidad.
+#requires -Version 5.1
+
 [CmdletBinding(SupportsShouldProcess=$true)]
 param (
     # Fuerza el reinicio automático al finalizar sin preguntar.
@@ -82,8 +85,10 @@ function Clear-RecycleBinAllDrives {
 
 function Clear-SoftwareDistribution {
     # Detener el servicio de Windows Update para liberar los archivos
+    $wasRunning = $false
     $service = Get-Service -Name wuauserv -ErrorAction SilentlyContinue
-    if ($null -ne $service -and $service.Status -ne 'Stopped') {
+    if ($service -and $service.Status -ne 'Stopped') {
+        $wasRunning = $true
         Stop-Service -Name wuauserv -Force -ErrorAction SilentlyContinue
         # Esperar de forma fiable a que el servicio se detenga (hasta 30 segundos)
         $service.WaitForStatus('Stopped', [System.TimeSpan]::FromSeconds(30))
@@ -94,8 +99,10 @@ function Clear-SoftwareDistribution {
         Get-ChildItem -Path $path -Recurse -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
     }
 
-    # Reiniciar el servicio de Windows Update
-    Start-Service -Name wuauserv -ErrorAction SilentlyContinue
+    # Reiniciar el servicio de Windows Update solo si estaba en ejecución previamente
+    if ($wasRunning) {
+        Start-Service -Name wuauserv -ErrorAction SilentlyContinue
+    }
 }
 
 function Clear-EventLogs {
@@ -380,7 +387,7 @@ function Clear-OldDrivers {
     # El método es seguro: solo elimina drivers que no están asociados a ningún dispositivo.
     try {
         $oldDrivers = Get-CimInstance -ClassName Win32_PnPSignedDriver | Where-Object { -not $_.DeviceID }
-        if ($null -eq $oldDrivers) { return }
+        if (-not $oldDrivers) { return }
 
         foreach ($driver in $oldDrivers) {
             # Usamos pnputil para una desinstalación limpia del paquete de drivers.
@@ -406,14 +413,14 @@ function Optimize-Drives {
     $allFixedVolumes = Get-Volume | Where-Object { $_.DriveType -eq 'Fixed' }
     $volumesToOptimize = $allFixedVolumes | Where-Object { $_.FileSystem -ne 'RAW' -and $_.HealthStatus -eq 'Healthy' }
 
-    if ($null -eq $volumesToOptimize) {
+    if (-not $volumesToOptimize) {
         Write-Host "`n     -> No se encontraron unidades aptas para optimizar (Unidades fijas, con formato y en buen estado)." -ForegroundColor Yellow
         return
     }
 
     # Informar sobre unidades omitidas para mayor claridad
     $skippedVolumes = Compare-Object -ReferenceObject $allFixedVolumes -DifferenceObject $volumesToOptimize -PassThru | Where-Object { $_.SideIndicator -eq '<=' }
-    if ($null -ne $skippedVolumes) {
+    if ($skippedVolumes) {
         foreach ($skipped in $skippedVolumes) {
             $reason = if ($skipped.FileSystem -eq 'RAW') { "Sistema de archivos RAW" } elseif ($skipped.HealthStatus -ne 'Healthy') { "Estado no es 'Saludable' ($($skipped.HealthStatus))" } else { "Razón desconocida" }
             Write-Host "`n     -> Omitiendo Unidad $($skipped.DriveLetter): ($reason)." -ForegroundColor Gray
