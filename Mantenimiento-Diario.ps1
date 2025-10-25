@@ -112,7 +112,13 @@ function Clear-SoftwareDistribution {
 }
 
 function Clear-EventLogs {
+    # Se mueve el bucle fuera de Write-TaskStatus para evitar la salida repetitiva en el transcript.
+    # La función ahora solo contiene la lógica de limpieza.
     $logs = Get-WinEvent -ListLog * -ErrorAction SilentlyContinue
+    if (-not $logs) {
+        Write-Warning "No se encontraron registros de eventos para limpiar."
+        return
+    }
     foreach ($log in $logs) {
         # Se redirige la salida de error a $null para evitar que un fallo en un solo log (p. ej. por permisos de "Acceso denegado")
         # haga que toda la tarea de "Write-TaskStatus" se marque como fallida.
@@ -209,10 +215,13 @@ function Remove-Bloatware {
 
     foreach ($pattern in $bloatware) {
         # Eliminar paquetes de usuario
-        $allPackages | Where-Object { $_.Name -like $pattern } | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue
+        $userPackages = $allPackages | Where-Object { $_.Name -like $pattern }
+        if ($userPackages) { $userPackages | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue }
 
         # Eliminar paquetes provisionados para futuros usuarios
-        $allProvisionedPackages | Where-Object { $_.DisplayName -like $pattern } | Remove-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue
+        # Se verifica la existencia antes de intentar eliminar para evitar errores de "ruta no encontrada".
+        $provisionedPackages = $allProvisionedPackages | Where-Object { $_.DisplayName -like $pattern }
+        if ($provisionedPackages) { $provisionedPackages | Remove-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue }
     }
 
     Write-Host "     Limpieza de Bloatware completada." -ForegroundColor Green
@@ -438,7 +447,7 @@ function Repair-SystemFiles {
 
 function Optimize-Drives {
     $allFixedVolumes = Get-Volume | Where-Object { $_.DriveType -eq 'Fixed' }
-    $volumesToOptimize = $allFixedVolumes | Where-Object { $_.FileSystem -ne 'RAW' -and $_.HealthStatus -eq 'Healthy' }
+    $volumesToOptimize = $allFixedVolumes | Where-Object { $_.DriveLetter -and $_.FileSystem -ne 'RAW' -and $_.HealthStatus -eq 'Healthy' }
 
     if (-not $volumesToOptimize) {
         Write-Host "`n     -> No se encontraron unidades aptas para optimizar (Unidades fijas, con formato y en buen estado)." -ForegroundColor Yellow
@@ -465,6 +474,40 @@ function Optimize-Drives {
         } else {
             throw "No se pudo optimizar la unidad $($volume.DriveLetter)."
         }
+    }
+}
+
+function Optimize-Windows11UI {
+    # Esta función aplica ajustes de interfaz específicos para Windows 11.
+    # Solo se ejecuta si se detecta Windows 11.
+    $osVersion = (Get-CimInstance -ClassName Win32_OperatingSystem).Caption
+    if ($osVersion -notlike "*Windows 11*") {
+        return
+    }
+
+    Write-Host "`n  -> Aplicando optimizaciones de interfaz para Windows 11..."
+
+    try {
+        # Desactivar Widgets (Tablero) en la barra de tareas
+        Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarDa" -Value 0 -Force
+
+        # Desactivar Chat (Teams) en la barra de tareas
+        Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarMn" -Value 0 -Force
+
+        # Alinear barra de tareas a la izquierda (0 = Izquierda, 1 = Centro)
+        Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarAl" -Value 0 -Force
+
+        # Desactivar la sección "Recomendado" en el Menú Inicio
+        Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "Start_ShowRecommended" -Value 0 -Force
+
+        # Activar modo compacto en el Explorador de Archivos
+        Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "UseCompactMode" -Value 1 -Force
+
+        Write-Host "     -> Reiniciando el Explorador de Windows para aplicar cambios..." -ForegroundColor Gray
+        Stop-Process -Name explorer -Force
+        Write-Host " [OK]" -ForegroundColor Green
+    } catch {
+        throw "Ocurrió un error al aplicar los ajustes de UI para Windows 11. Error: $($_.Exception.Message)"
     }
 }
 
@@ -534,7 +577,10 @@ Write-TaskStatus -TaskName "Verificando conexión a Internet" -Action { Test-Int
 Write-Host "`n[Paso 2: Limpieza Profunda del Sistema]" -ForegroundColor Yellow
 Write-TaskStatus -TaskName "Limpiando archivos temporales" -Action { Clear-TemporaryFiles }
 Write-TaskStatus -TaskName "Vaciando la Papelera de Reciclaje" -Action { Clear-RecycleBinAllDrives }
-Write-TaskStatus -TaskName "Limpiando registros de eventos de Windows" -Action { Clear-EventLogs }
+# Se llama a Clear-EventLogs de forma diferente para evitar la salida masiva en el informe.
+Write-Host -NoNewline "  -> Limpiando registros de eventos de Windows..."
+Clear-EventLogs
+Write-Host " [OK]" -ForegroundColor Green
 Write-TaskStatus -TaskName "Limpiando caché de descargas de Windows Update" -Action { Clear-SoftwareDistribution }
 Remove-Bloatware
 Optimize-GoogleChrome
@@ -551,6 +597,7 @@ Write-TaskStatus -TaskName "Desactivando telemetría y servicios en segundo plan
 Write-TaskStatus -TaskName "Desactivando servicio de precarga (SysMain/Superfetch)" -Action { Disable-SysMain }
 Write-TaskStatus -TaskName "Desactivando características de juego de Xbox" -Action { Disable-GamingFeatures }
 Write-TaskStatus -TaskName "Ajustando efectos visuales para rendimiento" -Action { Disable-VisualEffects }
+Write-TaskStatus -TaskName "Optimizando interfaz de Windows 11" -Action { Optimize-Windows11UI }
 
 Write-Host "`n[Paso 4: Mantenimiento de Integridad y Discos]" -ForegroundColor Yellow
 Write-TaskStatus -TaskName "Optimizando unidades de disco (TRIM/Defrag)" -Action { Optimize-Drives }
