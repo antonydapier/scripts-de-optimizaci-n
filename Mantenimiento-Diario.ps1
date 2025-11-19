@@ -11,7 +11,6 @@
 param (
     # Evita el reinicio automático al finalizar el script.
     [switch]$NoReiniciar
-    [switch]$NoReiniciar,
 
     # Define el modo de ejecución del script.
     [Parameter(Mandatory=$false, HelpMessage="Elige 'Completo' para una optimización profunda inicial, o 'Rapido' para un mantenimiento periódico.")]
@@ -794,69 +793,31 @@ if (-not $PSBoundParameters.ContainsKey('Modo')) {
     Clear-Host # Limpiar el menú antes de continuar.
 }
 
-Write-Host "`n==========================================" -ForegroundColor Cyan
-Write-Host "=== INICIANDO SCRIPT DE OPTIMIZACIÓN ===" -ForegroundColor Cyan
-Write-Host "=========================================="
 Write-Host "`n======================================================" -ForegroundColor Cyan
 Write-Host "=== INICIANDO SCRIPT DE OPTIMIZACIÓN (Modo: $Modo) ===" -ForegroundColor Cyan
 Write-Host "======================================================"
 
-Write-Host "`n[Paso 1: Preparación y Verificaciones]" -ForegroundColor Yellow
-Write-TaskStatus -TaskName "Verificando conexión a Internet" -Action { Test-InternetConnection }
 # =================================================================================
 # TAREAS DEL MODO RÁPIDO (Se ejecutan siempre, son la base del mantenimiento)
 # =================================================================================
 
-Write-Host "`n[Paso 2: Limpieza Profunda del Sistema]" -ForegroundColor Yellow
 Write-Host "`n[Mantenimiento Rápido: Limpieza de Archivos]" -ForegroundColor Yellow
+Write-TaskStatus -TaskName "Limpiando archivos temporales" -Action { Clear-TemporaryFiles }
+Write-TaskStatus -TaskName "Vaciando la Papelera de Reciclaje" -Action { Clear-RecycleBinAllDrives }
 Write-TaskStatus -TaskName "Limpiando caché de descargas de Windows Update" -Action { Clear-SoftwareDistribution }
 Write-TaskStatus -TaskName "Limpiando caché de DNS" -Action { Flush-DnsCache }
 Write-TaskStatus -TaskName "Optimizando unidades de disco (TRIM/Defrag)" -Action { Optimize-Drives }
-Write-TaskStatus -TaskName "Limpiando archivos temporales" -Action { Clear-TemporaryFiles }
-Write-TaskStatus -TaskName "Vaciando la Papelera de Reciclaje" -Action { Clear-RecycleBinAllDrives }
-# Se llama a Clear-EventLogs de forma diferente para evitar la salida masiva en el informe.
-Write-Host -NoNewline "  -> Limpiando registros de eventos de Windows..."
-Clear-EventLogs
-Write-Host " [OK]" -ForegroundColor Green
-Write-TaskStatus -TaskName "Limpiando caché de descargas de Windows Update" -Action { Clear-SoftwareDistribution }
-Remove-Bloatware
-# Optimize-GoogleChrome # Desactivado según solicitud
-Optimize-Adobe
-Write-TaskStatus -TaskName "Limpiando drivers antiguos del sistema (puede tardar)" -Action { Clear-OldDrivers }
+
 # =================================================================================
 # TAREAS DEL MODO COMPLETO (Se ejecutan solo si se especifica -Modo Completo)
 # =================================================================================
 
-Write-Host "`n[Paso 3: Optimización del Sistema y Red]" -ForegroundColor Yellow
-Write-TaskStatus -TaskName "Configurando DNS de Google (8.8.8.8, 8.8.4.4)" -Action { Set-GoogleDns }
-Write-TaskStatus -TaskName "Optimizando configuración de red" -Action { Set-NetworkOptimization }
-Write-TaskStatus -TaskName "Eliminando límite de ancho de banda reservable" -Action { Set-BandwidthLimit }
-Write-TaskStatus -TaskName "Limpiando caché de DNS" -Action { Flush-DnsCache }
-Write-TaskStatus -TaskName "Deshabilitando aplicaciones de inicio" -Action { Disable-StartupApps }
-Write-TaskStatus -TaskName "Desactivando telemetría y servicios en segundo plano" -Action { Optimize-BackgroundProcesses }
-Write-TaskStatus -TaskName "Desactivando búsquedas web y widgets de pantalla de bloqueo" -Action { Disable-WebSearch }
-Write-TaskStatus -TaskName "Desactivando P2P de Updates y actualizaciones de la Store" -Action { Disable-DeliveryOptimization }
-Write-TaskStatus -TaskName "Desactivando servicio de precarga (SysMain/Superfetch)" -Action { Disable-SysMain }
-Write-TaskStatus -TaskName "Desactivando características de juego de Xbox" -Action { Disable-GamingFeatures }
-Write-TaskStatus -TaskName "Desactivando Cortana por completo" -Action { Disable-Cortana }
-Write-TaskStatus -TaskName "Desactivando integración de OneDrive" -Action { Disable-OneDriveIntegration }
-Write-TaskStatus -TaskName "Desactivando hibernación e Inicio Rápido" -Action { Disable-Hibernation }
-Write-TaskStatus -TaskName "Priorizando aplicaciones en primer plano" -Action { Prioritize-ForegroundApps }
-Write-TaskStatus -TaskName "Desactivando nombres de archivo cortos (8.3)" -Action { Disable-8dot3Names }
-Write-TaskStatus -TaskName "Bloqueando servidores de telemetría (archivo hosts)" -Action { Block-TelemetryHosts }
-Write-TaskStatus -TaskName "Optimizando plan de energía para 'Mejor Rendimiento'" -Action { Optimize-PowerPlan }
-Write-TaskStatus -TaskName "Ajustando efectos visuales para rendimiento" -Action { Disable-VisualEffects }
-Write-TaskStatus -TaskName "Optimizando interfaz de Windows 11" -Action { Optimize-Windows11UI }
 if ($Modo -eq 'Completo') {
     Write-Host "`n[Optimización Completa: Tareas Profundas y de Configuración]" -ForegroundColor Yellow
 
-Write-Host "`n[Paso 4: Mantenimiento de Integridad y Discos]" -ForegroundColor Yellow
-Write-TaskStatus -TaskName "Optimizando unidades de disco (TRIM/Defrag)" -Action { Optimize-Drives }
-Write-TaskStatus -TaskName "Reparando archivos de sistema (SFC y DISM)" -Action { Repair-SystemFiles }
     # Verificación de Internet (solo necesaria para tareas completas como DNS)
     Write-TaskStatus -TaskName "Verificando conexión a Internet" -Action { Test-InternetConnection }
 
-Write-Host "`n[Paso 5: Finalización e Informe]" -ForegroundColor Yellow
     # Limpiezas profundas y lentas
     Write-Host -NoNewline "  -> Limpiando registros de eventos de Windows..."
     Clear-EventLogs
