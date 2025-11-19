@@ -686,16 +686,18 @@ function Optimize-Windows11UI {
     }
 
     # Desactivar Widgets (Tablero) en la barra de tareas.
-    # El método cambió en builds recientes de W11. Intentamos ambos para máxima compatibilidad.
-    # Método antiguo:
-    Set-UIProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarDa" -Value 0
-    # Método nuevo (build 22621.1344+):
+    # El método cambió en builds recientes de W11. Intentamos ambos para máxima compatibilidad,
+    # suprimiendo errores si la clave no es aplicable a la versión actual.
+    # Método antiguo (para builds anteriores):
+    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarDa" -Value 0 -Force -ErrorAction SilentlyContinue | Out-Null
+    # Método nuevo (para builds 22621.1344+):
     $taskbarPinPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarPin"
     if (-not (Test-Path $taskbarPinPath)) { New-Item -Path $taskbarPinPath -Force -ErrorAction SilentlyContinue | Out-Null }
-    Set-UIProperty -Path $taskbarPinPath -Name "TaskbarDa" -Value 0
+    Set-ItemProperty -Path $taskbarPinPath -Name "TaskbarDa" -Value 0 -Force -ErrorAction SilentlyContinue | Out-Null
 
-    # Desactivar Chat (Teams) en la barra de tareas
-    Set-UIProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarMn" -Value 0
+    # Desactivar Chat (Teams) en la barra de tareas.
+    # Similar a Widgets, puede variar entre builds. Suprimimos errores.
+    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarMn" -Value 0 -Force -ErrorAction SilentlyContinue | Out-Null
 
     # Alinear barra de tareas a la izquierda (0 = Izquierda, 1 = Centro)
     Set-UIProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarAl" -Value 0
