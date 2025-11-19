@@ -624,13 +624,13 @@ function Clear-OldDrivers {
 function Repair-SystemFiles {
     Write-Host "`n     -> Paso 1/3: Limpiando componentes de Windows Update..." -ForegroundColor Gray
     # Se añade /ResetBase para una limpieza más agresiva. Esto elimina la posibilidad de desinstalar updates previos.
-    Dism.exe /Online /Cleanup-Image /StartComponentCleanup /ResetBase
+    Dism.exe /Online /Cleanup-Image /StartComponentCleanup /ResetBase | Out-Null
 
     Write-Host "`n     -> Paso 2/3: Ejecutando SFC /scannow (esto puede tardar)..." -ForegroundColor Gray
-    sfc.exe /scannow
+    sfc.exe /scannow | Out-Null
 
     Write-Host "`n     -> Paso 3/3: Ejecutando DISM /RestoreHealth (esto puede tardar aún más)..." -ForegroundColor Gray
-    Dism.exe /Online /Cleanup-Image /RestoreHealth
+    Dism.exe /Online /Cleanup-Image /RestoreHealth | Out-Null
 }
 
 function Optimize-Drives {
