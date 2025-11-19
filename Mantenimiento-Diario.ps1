@@ -139,8 +139,10 @@ function Clear-EventLogs {
 
 function Get-DiskSpace {
     Write-Host "`nEspacio en disco disponible:" -ForegroundColor Yellow
-    Get-PSDrive -PSProvider FileSystem | ForEach-Object {
-        Write-Host "Unidad $($_.Name): $([math]::Round($_.Free/1GB,2)) GB libres de $([math]::Round($_.Used/1GB + $_.Free/1GB,2)) GB" -ForegroundColor Green
+    # Se filtra para mostrar solo unidades con una letra (ej. C, D) y se excluyen las unidades temporales de PowerShell.
+    $drives = Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Name -match '^[A-Z]$' }
+    foreach ($drive in $drives) {
+        Write-Host "Unidad $($drive.Name): $([math]::Round($drive.Free/1GB,2)) GB libres de $([math]::Round($drive.Used/1GB + $drive.Free/1GB,2)) GB" -ForegroundColor Green
     }
 }
 
@@ -161,9 +163,17 @@ function Set-GoogleDns {
         Write-Host "`n     -> Configurando DNS para $($adapter.Name)..." -ForegroundColor Gray
         # Solo modificar adaptadores que tienen una configuración IP
         $ipconfig = Get-NetIPConfiguration -InterfaceIndex $adapter.InterfaceIndex
-        if ($ipconfig.IPv4Address.IPAddress) {
-            # El comando Set-DnsClientServerAddress ya muestra un output, no necesitamos más confirmación.
-            Set-DnsClientServerAddress -InterfaceIndex $adapter.InterfaceIndex -ServerAddresses $googleDns
+        # Verificar si los DNS de Google ya están configurados
+        $currentDns = $ipconfig.DNSServer.IPAddress
+        if ($ipconfig.IPv4Address.IPAddress -and ($null -eq $currentDns -or -not ([System.Linq.Enumerable]::SequenceEqual($currentDns, $googleDns)))) {
+            try {
+                Set-DnsClientServerAddress -InterfaceIndex $adapter.InterfaceIndex -ServerAddresses $googleDns -ErrorAction Stop
+                Write-Host "        DNS de Google configurados." -ForegroundColor Green
+            } catch {
+                Write-Host "        No se pudieron configurar los DNS. Error: $($_.Exception.Message)" -ForegroundColor Red
+            }
+        } else {
+            Write-Host "        Ya está usando los DNS de Google o no tiene IP. Omitiendo." -ForegroundColor Gray
         }
     }
 }
@@ -370,37 +380,6 @@ function Set-BandwidthLimit {
         Log-Error "No se pudieron eliminar algunos archivos de datos de Chrome. Error: $($_.Exception.Message)"
     }
 } #>
-
-function Optimize-Adobe {
-    Write-Host "`n  -> Optimizando aplicaciones de Adobe (limpieza de caché)..."
-    $adobePath = "$env:ProgramFiles\Adobe"
-    if (-not (Test-Path $adobePath)) {
-        Write-Host " [NO APLICA - No se detectó instalación de Adobe]" -ForegroundColor Yellow
-        return
-    }
-
-    Write-Host -NoNewline "    -> Cerrando procesos de Adobe..."
-    $adobeApps = @("Photoshop", "Illustrator", "InDesign", "Premiere Pro", "AfterFX", "Audition", "Bridge")
-    $processes = Get-Process -Name $adobeApps -ErrorAction SilentlyContinue
-    if ($processes) {
-        $processes | Stop-Process -Force -ErrorAction SilentlyContinue
-        Write-Host " [OK]" -ForegroundColor Green
-    } else {
-        Write-Host " [No hay procesos activos]" -ForegroundColor Gray
-    }
-
-    Write-Host -NoNewline "    -> Limpiando caché de medios de Adobe..."
-    try {
-        $cachePaths = @("$env:APPDATA\Adobe\Common\Media Cache", "$env:APPDATA\Adobe\Common\Media Cache Files")
-        foreach ($path in $cachePaths) {
-            if (Test-Path $path) { Remove-Item -Path $path -Recurse -Force -ErrorAction Stop }
-        }
-        Write-Host " [OK]" -ForegroundColor Green
-    } catch {
-        Write-Host " [FALLÓ]" -ForegroundColor Red
-        Log-Error "No se pudo limpiar la caché de Adobe. Es posible que algunos archivos estuvieran en uso. Error: $($_.Exception.Message)"
-    }
-}
 
 function Optimize-BackgroundProcesses {
     # Lista ampliada de servicios a deshabilitar. No se incluye 'Spooler' para no afectar a las impresoras.
@@ -668,10 +647,14 @@ function Optimize-Drives {
 function Optimize-Windows11UI {
     # Esta función aplica ajustes de interfaz específicos para Windows 11.
     # Solo se ejecuta si se detecta Windows 11.
+    # Se añade una doble verificación para asegurar que solo se ejecute en modo completo.
+    if ($Modo -ne 'Completo') { return }
+
     $osVersion = (Get-CimInstance -ClassName Win32_OperatingSystem).Caption
     if ($osVersion -notlike "*Windows 11*") {
         return
     }
+
 
     Write-Host "`n  -> Aplicando optimizaciones de interfaz para Windows 11..."
 
@@ -708,6 +691,12 @@ function Optimize-Windows11UI {
 }
 
 function Handle-SmartRestart {
+    # El reinicio automático solo debe ocurrir en el modo completo, que es el que realiza cambios profundos.
+    if ($Modo -ne 'Completo') {
+        Write-Host "`nEl mantenimiento rápido ha finalizado. Se recomienda reiniciar el equipo manualmente cuando sea conveniente." -ForegroundColor Cyan
+        return
+    }
+
     if ($NoReiniciar.IsPresent) {
         Write-Host "`nReinicio automático omitido por el usuario. Recuerda reiniciar manualmente para aplicar todos los cambios." -ForegroundColor Cyan
         return
@@ -811,7 +800,6 @@ if ($Modo -eq 'Completo') {
     Clear-EventLogs
     Write-Host " [OK]" -ForegroundColor Green
     Remove-Bloatware
-    Optimize-Adobe
     Write-TaskStatus -TaskName "Limpiando drivers antiguos del sistema (puede tardar)" -Action { Clear-OldDrivers }
 
     # Configuración del sistema y red (se hace una vez)
