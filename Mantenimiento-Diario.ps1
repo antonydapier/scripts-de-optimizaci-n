@@ -685,8 +685,14 @@ function Optimize-Windows11UI {
         }
     }
 
-    # Desactivar Widgets (Tablero) en la barra de tareas
+    # Desactivar Widgets (Tablero) en la barra de tareas.
+    # El método cambió en builds recientes de W11. Intentamos ambos para máxima compatibilidad.
+    # Método antiguo:
     Set-UIProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarDa" -Value 0
+    # Método nuevo (build 22621.1344+):
+    $taskbarPinPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarPin"
+    if (-not (Test-Path $taskbarPinPath)) { New-Item -Path $taskbarPinPath -Force -ErrorAction SilentlyContinue | Out-Null }
+    Set-UIProperty -Path $taskbarPinPath -Name "TaskbarDa" -Value 0
 
     # Desactivar Chat (Teams) en la barra de tareas
     Set-UIProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarMn" -Value 0
@@ -703,10 +709,7 @@ function Optimize-Windows11UI {
     # Restaurar el menú contextual clásico (más rápido) de Windows 10
     Set-UIProperty -Path "HKCU:\Software\Classes\CLSID" -Name "(Default)" -Value "{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}"
 
-    Write-Host "     -> Reiniciando el Explorador de Windows para aplicar cambios..." -ForegroundColor Gray
     Stop-Process -Name explorer -Force
-    # No se necesita un try/catch aquí, si explorer no está, no hay nada que hacer.
-    # El Write-Host [OK] se moverá a la llamada principal para indicar que la tarea se ejecutó.
 
 }
 
@@ -840,6 +843,7 @@ if ($Modo -eq 'Completo') {
     Write-Host -NoNewline "  -> Optimizando interfaz de Windows 11..."
     if ((Get-CimInstance -ClassName Win32_OperatingSystem).Caption -like "*Windows 11*") {
         Optimize-Windows11UI
+        Write-Host " [OK]" -ForegroundColor Green
     } else {
         Write-Host " [NO APLICA - Sistema no es Windows 11]" -ForegroundColor Yellow
     }
