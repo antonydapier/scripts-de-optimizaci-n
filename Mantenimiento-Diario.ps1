@@ -10,7 +10,7 @@
 [CmdletBinding(SupportsShouldProcess=$true)]
 param (
     # Evita el reinicio automático al finalizar el script.
-    [switch]$NoReiniciar
+    [switch]$NoReiniciar, # Se añade la coma que faltaba aquí.
 
     # Define el modo de ejecución del script.
     [Parameter(Mandatory=$false, HelpMessage="Elige 'Completo' para una optimización profunda inicial, o 'Rapido' para un mantenimiento periódico.")]
@@ -831,7 +831,7 @@ if ($Modo -eq 'Completo') {
     Write-TaskStatus -TaskName "Optimizando configuración de red" -Action { Set-NetworkOptimization }
     Write-TaskStatus -TaskName "Eliminando límite de ancho de banda reservable" -Action { Set-BandwidthLimit }
     Write-TaskStatus -TaskName "Deshabilitando aplicaciones de inicio" -Action { Disable-StartupApps }
-    Write-TaskStatus -TaskName "Desactivando telemetría y servicios en segundo plano" -Action { Optimize-BackgroundProcesses }
+    Write-TaskStatus -TaskName "Desactivando telemetría y servicios de fondo" -Action { Optimize-BackgroundProcesses }
     Write-TaskStatus -TaskName "Desactivando búsquedas web y widgets de pantalla de bloqueo" -Action { Disable-WebSearch }
     Write-TaskStatus -TaskName "Desactivando P2P de Updates y actualizaciones de la Store" -Action { Disable-DeliveryOptimization }
     Write-TaskStatus -TaskName "Desactivando servicio de precarga (SysMain/Superfetch)" -Action { Disable-SysMain }
