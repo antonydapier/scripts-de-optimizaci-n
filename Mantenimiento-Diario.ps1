@@ -737,35 +737,17 @@ function Handle-SmartRestart {
 
 Confirm-IsAdmin
 
-# --- MENSAJE DE BIENVENIDA ---
-Write-Host "`n***********************************************************************" -ForegroundColor Cyan
-Write-Host "   Gracias por usar este Script de Optimización para Windows 10 y 11" -ForegroundColor White
-Write-Host "   Enfocado para Diseñadores y Público en general." -ForegroundColor White
-Write-Host "   " # Línea en blanco para espaciar
-Write-Host "   Autor: Antony Dapier" -ForegroundColor White
-Write-Host "***********************************************************************" -ForegroundColor Cyan
+# --- LÓGICA DE SELECCIÓN DE MODO (ROBUSTA) ---
+# El script ahora siempre mostrará el menú para la selección manual del modo.
+Clear-Host
 
-# --- ADVERTENCIA INICIAL ---
-Write-Host "`n=======================================================================" -ForegroundColor Yellow
+Write-Host "=======================================================================" -ForegroundColor Yellow
 Write-Host "  ADVERTENCIA: Este script cerrará programas y modificará el sistema." -ForegroundColor Yellow
 Write-Host "  Por favor, GUARDE TODO SU TRABAJO y CIERRE TODAS LAS APLICACIONES." -ForegroundColor Yellow
 Write-Host "  AL FINALIZAR, EL EQUIPO SE REINICIARÁ AUTOMÁTICAMENTE." -ForegroundColor Red
 Write-Host "=======================================================================" -ForegroundColor Yellow
-try {
-    for ($i = 10; $i -ge 1; $i--) {
-        Write-Host -NoNewline "`rEl proceso comenzará automáticamente en $i segundos... (Presione CTRL+C para cancelar) "
-        Start-Sleep -Seconds 1
-    }
-    Write-Host "`n" # Newline after countdown
-} catch {
-    Write-Host "`n`nOperación cancelada por el usuario." -ForegroundColor Red
-    Stop-Transcript
-    exit
-}
+Write-Host
 
-# --- LÓGICA DE SELECCIÓN DE MODO (ROBUSTA) ---
-# El script ahora siempre mostrará el menú para la selección manual del modo.
-Clear-Host
 Write-Host "=========================================" -ForegroundColor Cyan
 Write-Host "   SELECCIONA EL MODO DE EJECUCIÓN" -ForegroundColor White
 Write-Host "=========================================" -ForegroundColor Cyan
