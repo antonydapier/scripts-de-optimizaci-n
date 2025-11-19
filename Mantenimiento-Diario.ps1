@@ -740,6 +740,15 @@ Confirm-IsAdmin
 # --- LÓGICA DE SELECCIÓN DE MODO (ROBUSTA) ---
 # El script ahora siempre mostrará el menú para la selección manual del modo.
 Clear-Host
+Write-Host
+
+Write-Host "***********************************************************************" -ForegroundColor Cyan
+Write-Host "   Gracias por usar este Script de Optimización para Windows 10 y 11" -ForegroundColor White
+Write-Host "   Enfocado para Diseñadores y Público en general." -ForegroundColor White
+Write-Host "   " # Línea en blanco para espaciar
+Write-Host "   Autor: Antony Dapier" -ForegroundColor White
+Write-Host "***********************************************************************" -ForegroundColor Cyan
+Write-Host
 
 Write-Host "=======================================================================" -ForegroundColor Yellow
 Write-Host "  ADVERTENCIA: Este script cerrará programas y modificará el sistema." -ForegroundColor Yellow
