@@ -14,7 +14,7 @@ param (
 
     # Define el modo de ejecución del script.
     [Parameter(Mandatory=$false, HelpMessage="Elige 'Completo' para una optimización profunda inicial, o 'Rapido' para un mantenimiento periódico.")]
-    [ValidateSet('Completo', 'Rapido')]
+    [ValidateSet('Completo', 'Rapido', '')]
     [string]$Modo # Ya no es obligatorio. La lógica se determinará más adelante.
 )
 
