@@ -14,10 +14,10 @@ param (
 
     # Define el modo de ejecución del script.
     [Parameter(Mandatory=$false, HelpMessage="Elige 'Completo' para una optimización profunda inicial, o 'Rapido' para un mantenimiento periódico.")]
-    [ValidateSet('Completo', 'Rapido', '')]
-    [string]$Modo # Ya no es obligatorio. La lógica se determinará más adelante.
+    [string]$Modo
 )
 
+# --- VALIDACIÓN DE MODO Y LÓGICA DE MENÚ ---
 # --- INICIO DE LA CONFIGURACIÓN DEL INFORME ---
 # Usar un método más robusto para encontrar el Escritorio, compatible con OneDrive.
 $desktopPath = [System.Environment]::GetFolderPath('Desktop')
@@ -763,35 +763,32 @@ try {
     exit
 }
 
-# --- LÓGICA DE SELECCIÓN DE MODO ---
-# Si el script se ejecuta sin especificar un modo, se decide qué hacer.
-# La nueva lógica es mostrar SIEMPRE un menú si no se usa un parámetro.
-if (-not $PSBoundParameters.ContainsKey('Modo')) {
-    # Mostrar siempre el menú para que el usuario elija.
-    Clear-Host
-    Write-Host "=========================================" -ForegroundColor Cyan
-    Write-Host "   SELECCIONA EL MODO DE EJECUCIÓN" -ForegroundColor White
-    Write-Host "=========================================" -ForegroundColor Cyan
-    Write-Host
-    Write-Host "   [1] Modo Completo:" -ForegroundColor Yellow
-    Write-Host "       Optimización profunda. Ideal para la primera vez o un mantenimiento anual."
-    Write-Host "       (Lento, incluye SFC, DISM, eliminación de bloatware, etc.)"
-    Write-Host
-    Write-Host "   [2] Modo Rápido:" -ForegroundColor Yellow
-    Write-Host "       Mantenimiento periódico. Ideal para uso semanal o mensual."
-    Write-Host "       (Rápido, solo limpiezas esenciales de archivos y caché.)"
-    Write-Host
-    Write-Host "   [S] Salir" -ForegroundColor Red
-    Write-Host
-    
-    $choice = Read-Host "Por favor, elige una opción (1, 2, S)"
-    switch ($choice) {
-        '1' { $Modo = 'Completo' }
-        '2' { $Modo = 'Rapido' }
-        default { Write-Host "Selección no válida. Saliendo."; Stop-Transcript; exit }
-    }
-    Clear-Host # Limpiar el menú antes de continuar.
+# --- LÓGICA DE SELECCIÓN DE MODO (ROBUSTA) ---
+# El script ahora siempre mostrará el menú para la selección manual del modo.
+Clear-Host
+Write-Host "=========================================" -ForegroundColor Cyan
+Write-Host "   SELECCIONA EL MODO DE EJECUCIÓN" -ForegroundColor White
+Write-Host "=========================================" -ForegroundColor Cyan
+Write-Host
+Write-Host "   [1] Modo Completo:" -ForegroundColor Yellow
+Write-Host "       Optimización profunda. Ideal para la primera vez o un mantenimiento anual."
+Write-Host "       (Lento, incluye SFC, DISM, eliminación de bloatware, etc.)"
+Write-Host
+Write-Host "   [2] Modo Rápido:" -ForegroundColor Yellow
+Write-Host "       Mantenimiento periódico. Ideal para uso semanal o mensual."
+Write-Host "       (Rápido, solo limpiezas esenciales de archivos y caché.)"
+Write-Host
+Write-Host "   [S] Salir" -ForegroundColor Red
+Write-Host
+
+$choice = Read-Host "Por favor, elige una opción (1, 2, S)"
+switch ($choice) {
+    '1' { $Modo = 'Completo' }
+    '2' { $Modo = 'Rapido' }
+    default { Write-Host "Selección no válida. Saliendo."; Stop-Transcript; exit }
 }
+Clear-Host # Limpiar el menú antes de continuar.
+
 
 Write-Host "`n======================================================" -ForegroundColor Cyan
 Write-Host "=== INICIANDO SCRIPT DE OPTIMIZACIÓN (Modo: $Modo) ===" -ForegroundColor Cyan
