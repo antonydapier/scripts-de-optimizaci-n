@@ -520,14 +520,17 @@ function Optimize-PowerPlan {
     $balancedGuid = "381b4222-f694-41f0-9685-ff5bb260df2e"
     powercfg /setactive $balancedGuid
 
-    # 2. Ajustar el "Modo de Energía" (Power Slider) a "Mejor Rendimiento".
-    # Esto le da al sistema más agilidad sin los extremos del plan "Máximo Rendimiento".
-    # GUID para la configuración del deslizador de energía: {31f9f286-5084-42fe-b535-076635296c08}
-    # Valores: 0=Máximo Rendimiento, 1=Mejor Rendimiento, 2=Recomendado/Equilibrado, 3=Ahorro de energía
-    $powerSliderGuid = "{31f9f286-5084-42fe-b535-076635296c08}"
-    $betterPerformanceValue = 1
-    powercfg /setacvalueindex $balancedGuid SUB_PowerThrottling $powerSliderGuid $betterPerformanceValue
-    powercfg /setdcvalueindex $balancedGuid SUB_PowerThrottling $powerSliderGuid $betterPerformanceValue
+    # 2. Ajustar el "Modo de Energía" (Power Slider) si está disponible (típicamente en portátiles).
+    # Esto evita errores en PCs de escritorio donde esta opción no existe.
+    $powerSliderSettingExists = (powercfg /q $balancedGuid SUB_PowerThrottling) -match "Power Slider"
+    if ($powerSliderSettingExists) {
+        # GUID para la configuración del deslizador de energía: {31f9f286-5084-42fe-b535-076635296c08}
+        # Valores: 0=Máximo Rendimiento, 1=Mejor Rendimiento, 2=Recomendado/Equilibrado, 3=Ahorro de energía
+        $powerSliderGuid = "{31f9f286-5084-42fe-b535-076635296c08}"
+        $betterPerformanceValue = 1
+        powercfg /setacvalueindex $balancedGuid SUB_PowerThrottling $powerSliderGuid $betterPerformanceValue | Out-Null
+        powercfg /setdcvalueindex $balancedGuid SUB_PowerThrottling $powerSliderGuid $betterPerformanceValue | Out-Null
+    }
 }
 
 function Disable-Cortana {
