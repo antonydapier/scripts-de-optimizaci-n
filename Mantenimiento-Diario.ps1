@@ -841,7 +841,14 @@ if ($Modo -eq 'Completo') {
     Write-TaskStatus -TaskName "Bloqueando servidores de telemetría (archivo hosts)" -Action { Block-TelemetryHosts }
     Write-TaskStatus -TaskName "Optimizando plan de energía para 'Mejor Rendimiento'" -Action { Optimize-PowerPlan }
     Write-TaskStatus -TaskName "Ajustando efectos visuales para rendimiento" -Action { Disable-VisualEffects }
-    Write-TaskStatus -TaskName "Optimizando interfaz de Windows 11" -Action { Optimize-Windows11UI }
+    
+    # Tarea específica para Windows 11, con verificación previa para evitar advertencias en Windows 10.
+    Write-Host -NoNewline "  -> Optimizando interfaz de Windows 11..."
+    if ((Get-CimInstance -ClassName Win32_OperatingSystem).Caption -like "*Windows 11*") {
+        Optimize-Windows11UI
+    } else {
+        Write-Host " [NO APLICA - Sistema no es Windows 11]" -ForegroundColor Yellow
+    }
 
     # Mantenimiento de integridad (muy lento, solo para modo completo)
     Write-TaskStatus -TaskName "Reparando archivos de sistema (SFC y DISM)" -Action { Repair-SystemFiles }
