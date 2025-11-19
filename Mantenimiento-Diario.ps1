@@ -675,16 +675,6 @@ function Optimize-Windows11UI {
 
     Write-Host "`n  -> Aplicando optimizaciones de interfaz para Windows 11..."
 
-    # Se usa una función auxiliar para aplicar cada cambio y capturar errores individualmente.
-    function Set-UIProperty {
-        param($Path, $Name, $Value)
-        try {
-            Set-ItemProperty -Path $Path -Name $Name -Value $Value -Force -ErrorAction Stop
-        } catch {
-            Write-Warning "No se pudo aplicar el ajuste de UI para '$Name'. Puede que no sea compatible con esta versión de Windows."
-        }
-    }
-
     # Desactivar Widgets (Tablero) en la barra de tareas.
     # El método cambió en builds recientes de W11. Intentamos ambos para máxima compatibilidad,
     # suprimiendo errores si la clave no es aplicable a la versión actual.
@@ -700,16 +690,18 @@ function Optimize-Windows11UI {
     Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarMn" -Value 0 -Force -ErrorAction SilentlyContinue | Out-Null
 
     # Alinear barra de tareas a la izquierda (0 = Izquierda, 1 = Centro)
-    Set-UIProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarAl" -Value 0
+    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarAl" -Value 0 -Force -ErrorAction SilentlyContinue | Out-Null
 
     # Desactivar la sección "Recomendado" en el Menú Inicio
-    Set-UIProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "Start_ShowRecommended" -Value 0
+    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "Start_ShowRecommended" -Value 0 -Force -ErrorAction SilentlyContinue | Out-Null
 
     # Activar modo compacto en el Explorador de Archivos
-    Set-UIProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "UseCompactMode" -Value 1
+    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "UseCompactMode" -Value 1 -Force -ErrorAction SilentlyContinue | Out-Null
 
     # Restaurar el menú contextual clásico (más rápido) de Windows 10
-    Set-UIProperty -Path "HKCU:\Software\Classes\CLSID" -Name "(Default)" -Value "{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}"
+    $classicMenuPath = "HKCU:\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32"
+    if (-not (Test-Path $classicMenuPath)) { New-Item -Path $classicMenuPath -Force -ErrorAction SilentlyContinue | Out-Null }
+    Set-ItemProperty -Path $classicMenuPath -Name "(Default)" -Value "" -Force -ErrorAction SilentlyContinue | Out-Null
 
     Stop-Process -Name explorer -Force
 
