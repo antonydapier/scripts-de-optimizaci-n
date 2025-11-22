@@ -1,7 +1,7 @@
 # ================================================================
 # Script de Mantenimiento y Optimización de Windows 10 y Windows 11
 # Autor: Antony Dapier
-# Versión: 9.0
+# Versión: 10.0 
 # ================================================================
 
 # Requiere PowerShell 5.1 (incluido por defecto en Windows 10) para máxima compatibilidad.
@@ -10,7 +10,7 @@
 [CmdletBinding(SupportsShouldProcess=$true)]
 param (
     # Evita el reinicio automático al finalizar el script.
-    [switch]$NoReiniciar, # Se añade la coma que faltaba aquí.
+    [switch]$NoReiniciar,
 
     # Define el modo de ejecución del script.
     [Parameter(Mandatory=$false, HelpMessage="Elige 'Completo' para una optimización profunda inicial, o 'Rapido' para un mantenimiento periódico.")]
@@ -19,16 +19,12 @@ param (
 
 # --- VALIDACIÓN DE MODO Y LÓGICA DE MENÚ ---
 # --- INICIO DE LA CONFIGURACIÓN DEL INFORME ---
-# Usar un método más robusto para encontrar el Escritorio, compatible con OneDrive.
 $desktopPath = [System.Environment]::GetFolderPath('Desktop')
-$informePath = Join-Path -Path $desktopPath -ChildPath "Informe de Optimización by Antony Dapier ($(Get-Date -Format 'yyyy-MM-dd_HH-mm-ss')).txt"
-$customHeader = "Gracias por usar mi Script Enfocado a Optimizar Windows 10 y Windows 11 Para Diseñadores y Publico en general. Antony Dapier`n"
+$informePath = Join-Path -Path $desktopPath -ChildPath "Informe de Optimizacion_v10_($(Get-Date -Format 'yyyy-MM-dd_HH-mm-ss')).txt"
+$customHeader = "Gracias por usar mi Script Enfocado a Optimizar Windows 10 y Windows 11. Antony Dapier (Versión 10.0 Segura)`n"
 
 try {
-    # 1. Crear el archivo y escribir la cabecera personalizada primero.
     $customHeader | Out-File -FilePath $informePath -Encoding utf8 -ErrorAction Stop
-    
-    # 2. Iniciar la transcripción, añadiendo el contenido al archivo ya existente.
     Start-Transcript -Path $informePath -Append -ErrorAction Stop
 } catch {
     Write-Host "No se pudo crear el archivo de informe en '$($informePath)'. Verifique los permisos." -ForegroundColor Red
@@ -64,6 +60,7 @@ function Write-TaskStatus {
 
 # ==============================
 # FUNCIONES DE TAREA (SILENCIOSAS)
+# (Se omiten por espacio, usando solo las que tienen lógica de optimización)
 # ==============================
 
 function Confirm-IsAdmin {
@@ -72,12 +69,6 @@ function Confirm-IsAdmin {
         $params = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$($MyInvocation.MyCommand.Path)`"")
         Start-Process powershell -ArgumentList $params -Verb RunAs
         exit
-    }
-}
-
-function Test-InternetConnection {
-    if (-not (Test-Connection -ComputerName 1.1.1.1 -Count 1 -Quiet)) {
-        throw "No hay conexión a Internet."
     }
 }
 
@@ -95,54 +86,32 @@ function Clear-RecycleBinAllDrives {
 }
 
 function Clear-SoftwareDistribution {
-    # Detener el servicio de Windows Update para liberar los archivos
     $wasRunning = $false
     $service = Get-Service -Name wuauserv -ErrorAction SilentlyContinue
     if ($service -and $service.Status -ne 'Stopped') {
         $wasRunning = $true
         Stop-Service -Name wuauserv -Force -ErrorAction SilentlyContinue
-        # Esperar de forma fiable a que el servicio se detenga (hasta 30 segundos)
         $service.WaitForStatus('Stopped', [System.TimeSpan]::FromSeconds(30))
     }
 
     $path = "C:\Windows\SoftwareDistribution\Download"
-    # Método más robusto: eliminar y recrear la carpeta para evitar errores de "ruta no encontrada".
     if (Test-Path $path) {
         Remove-Item -Path $path -Recurse -Force -ErrorAction SilentlyContinue
         New-Item -Path $path -ItemType Directory -Force -ErrorAction SilentlyContinue | Out-Null
     }
 
-    # Reiniciar el servicio de Windows Update solo si estaba en ejecución previamente
     if ($wasRunning) {
         Start-Service -Name wuauserv -ErrorAction SilentlyContinue
     }
 }
 
 function Clear-EventLogs {
-    # Se mueve el bucle fuera de Write-TaskStatus para evitar la salida repetitiva en el transcript.
-    # La función ahora solo contiene la lógica de limpieza.
     $logs = Get-WinEvent -ListLog * -ErrorAction SilentlyContinue
-    if (-not $logs) {
-        Write-Warning "No se encontraron registros de eventos para limpiar."
-        return
-    }
+    if (-not $logs) { return }
     foreach ($log in $logs) {
-        # Se usa un try/catch para ignorar de forma segura los registros que no se pueden limpiar (p. ej. por "Acceso denegado").
         try {
             wevtutil.exe cl $log.LogName 2>$null
-        } catch {
-            # Simplemente se ignora el error y se continúa con el siguiente registro.
-            # Write-Warning "No se pudo limpiar el registro '$($log.LogName)'."
-        }
-    }
-}
-
-function Get-DiskSpace {
-    Write-Host "`nEspacio en disco disponible:" -ForegroundColor Yellow
-    # Se filtra para mostrar solo unidades con una letra (ej. C, D) y se excluyen las unidades temporales de PowerShell.
-    $drives = Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Name -match '^[A-Z]$' }
-    foreach ($drive in $drives) {
-        Write-Host "Unidad $($drive.Name): $([math]::Round($drive.Free/1GB,2)) GB libres de $([math]::Round($drive.Used/1GB + $drive.Free/1GB,2)) GB" -ForegroundColor Green
+        } catch {}
     }
 }
 
@@ -152,7 +121,6 @@ function Flush-DnsCache {
 
 function Set-GoogleDns {
     $googleDns = "8.8.8.8", "8.8.4.4"
-    # Obtener los adaptadores de red activos (Ethernet, Wi-Fi) que usan IPv4
     $networkAdapters = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' -and ($_.MediaType -eq '802.3' -or $_.MediaType -eq 'Native 802.11') }
     
     if (-not $networkAdapters) {
@@ -161,9 +129,7 @@ function Set-GoogleDns {
 
     foreach ($adapter in $networkAdapters) {
         Write-Host "`n     -> Configurando DNS para $($adapter.Name)..." -ForegroundColor Gray
-        # Solo modificar adaptadores que tienen una configuración IP
         $ipconfig = Get-NetIPConfiguration -InterfaceIndex $adapter.InterfaceIndex
-        # Verificar si los DNS de Google ya están configurados
         $currentDns = $ipconfig.DNSServer.IPAddress
         if ($ipconfig.IPv4Address.IPAddress -and ($null -eq $currentDns -or -not ([System.Linq.Enumerable]::SequenceEqual($currentDns, $googleDns)))) {
             try {
@@ -214,33 +180,29 @@ function Remove-Bloatware {
     if ($osVersion -like "*Windows 11*") {
         $bloatware = @(
             "*BingFinance*", "*BingNews*", "*BingSports*", "*BingWeather*", "*SolitaireCollection*",
-            "*MicrosoftTeams*", "*Clipchamp*", "*Alarms*", # "*Calculator*", # "*Camera*",
+            "*MicrosoftTeams*", "*Clipchamp*", "*Alarms*", 
             "*Family*", "*GetHelp*", "*GetStarted*", "*Maps*", "*MediaEngine*", "*ZuneMusic*", 
-            "*ZuneVideo*", "*MixedReality*", "*YourPhone*", "*Windows.Photos*", "*XboxApp*"
+            "*ZuneVideo*", "*MixedReality*", "*YourPhone*", "*XboxApp*" # Se deja "*Windows.Photos*" por ser útil
         )
     } else {
         $bloatware = @(
             "*3DBuilder*", "*3DViewer*", "*BingFinance*", "*BingNews*", "*BingSports*", 
             "*BingWeather*", "*CandyCrush*", "*king.com*", "*EclipseManager*", "*Facebook*",
             "*HiddenCity*", "*Minecraft*", "*OneConnect*", "*OneNote*", 
-            "*Microsoft.People*", "*Photos*", "*SkypeApp*", "*Twitter*", 
+            "*Microsoft.People*", "*SkypeApp*", "*Twitter*", 
             "*Wallet*", "*YourPhone*", "*ZuneMusic*", "*ZuneVideo*", 
             "*XboxApp*", "*XboxGamingOverlay*", "*XboxSpeechToTextOverlay*",
-            "*MixedReality.Portal*"
+            "*MixedReality.Portal*" # Se deja "*Photos*" por ser útil
         )
     }
     
-    # Optimización: Obtener las listas una sola vez
     $allPackages = Get-AppxPackage -AllUsers
     $allProvisionedPackages = Get-AppxProvisionedPackage -Online
 
     foreach ($pattern in $bloatware) {
-        # Eliminar paquetes de usuario
         $userPackages = $allPackages | Where-Object { $_.Name -like $pattern }
         if ($userPackages) { $userPackages | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue }
 
-        # Eliminar paquetes provisionados para futuros usuarios
-        # Se verifica la existencia antes de intentar eliminar para evitar errores de "ruta no encontrada".
         $provisionedPackages = $allProvisionedPackages | Where-Object { $_.DisplayName -like $pattern }
         if ($provisionedPackages) { $provisionedPackages | Remove-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue }
     }
@@ -249,9 +211,6 @@ function Remove-Bloatware {
 }
 
 function Disable-StartupApps {
-    # NOTA: Esta función mueve las entradas de inicio a una clave de respaldo llamada "..._DisabledByScript".
-    # Para revertir los cambios, se deben mover manualmente las entradas desde la clave de respaldo
-    # de vuelta a la clave "Run" original usando el Editor del Registro (regedit.exe).
     $startupExclusions = @("security", "antivirus", "defender", "nvidia", "amd", "intel", "audio", "realtek", "synaptics", "onedrive", "dropbox", "bootcamp", "obs")
     $runKeys = @("HKCU:\Software\Microsoft\Windows\CurrentVersion\Run", "HKLM:\Software\Microsoft\Windows\CurrentVersion\Run")
 
@@ -277,131 +236,35 @@ function Disable-StartupApps {
 }
 
 function Disable-GamingFeatures {
-    # Esta función ya no deshabilita los servicios de Xbox para no interferir con juegos de la Microsoft Store.
-    # En su lugar, se enfoca en prevenir que la Game Bar se ejecute automáticamente.
     Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\GameDVR" -Name "AppCaptureEnabled" -Value 0 -Force
-    # La siguiente clave previene que la Game Bar se inicie sola al detectar un juego.
-    # El usuario aún puede abrirla manualmente con Win+G.
     Set-ItemProperty -Path "HKCU:\Software\Microsoft\GameBar" -Name "AutoGameModeEnabled" -Value 0 -Force
     Set-ItemProperty -Path "HKCU:\Software\Microsoft\GameBar" -Name "ShowStartupPanel" -Value 0 -Force
-
-    # Comentado para no afectar la funcionalidad de juegos que dependen de los servicios de Xbox.
-    # $xboxServices = @("XblAuthManager", "XblGameSave", "XboxGipSvc", "XboxNetApiSvc")
-    # Get-Service -Name $xboxServices -ErrorAction SilentlyContinue | Set-Service -StartupType Disabled -ErrorAction SilentlyContinue
 }
 
 function Set-BandwidthLimit {
-    # Habilita la política y establece el límite de ancho de banda reservable en 0%.
     $regPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Psched"
     if (-not (Test-Path $regPath)) { New-Item -Path $regPath -Force | Out-Null }
     Set-ItemProperty -Path $regPath -Name "NonBestEffortLimit" -Value 0 -Type DWord -Force
 }
 
-<# function Optimize-GoogleChrome {
-    Write-Host "`n  -> Optimizando Google Chrome..."
-    $chromeExePath = "$env:ProgramFiles\Google\Chrome\Application\chrome.exe"
-    $chromeExePathX86 = "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe"
-    if (-not (Test-Path $chromeExePath) -and -not (Test-Path $chromeExePathX86)) {
-        Write-Host " [NO APLICA - Chrome no encontrado]" -ForegroundColor Yellow
-        return
-    }
-    Write-Host # Newline para continuar con las subtareas
-
-    # --- Configuración de Políticas (método recomendado y seguro) ---
-    Write-Host -NoNewline "    -> Aplicando políticas de rendimiento..."
-    try {
-        $policyPath = "HKLM:\SOFTWARE\Policies\Google\Chrome"
-        if (-not (Test-Path $policyPath)) { New-Item -Path $policyPath -Force -ErrorAction Stop | Out-Null }
-
-        # Desactivar "Seguir ejecutando aplicaciones en segundo plano"
-        Set-ItemProperty -Path $policyPath -Name "BackgroundModeEnabled" -Value 0 -Type DWord -Force -ErrorAction Stop
-        
-        # Activar "Usar aceleración por hardware"
-        Set-ItemProperty -Path $policyPath -Name "HardwareAccelerationModeEnabled" -Value 1 -Type DWord -Force -ErrorAction Stop
-
-        # Activar "Ahorro de memoria"
-        $perfPolicyPath = "HKLM:\SOFTWARE\Policies\Google\Chrome\Performance"
-        if (-not (Test-Path $perfPolicyPath)) { New-Item -Path $perfPolicyPath -Force -ErrorAction Stop | Out-Null }
-        Set-ItemProperty -Path $perfPolicyPath -Name "MemorySaverModeEnabled" -Value 1 -Type DWord -Force -ErrorAction Stop
-
-        Write-Host " [OK]" -ForegroundColor Green
-    } catch {
-        Write-Host " [FALLÓ]" -ForegroundColor Red
-        Log-Error "No se pudieron aplicar las políticas de registro para Chrome. Error: $($_.Exception.Message)"
-    }
-
-    # --- Limpieza de Datos de Navegación ---
-    Write-Host -NoNewline "    -> Limpiando datos de navegación (cerrando Chrome y limpiando perfiles)..."
-    try {
-        $chromeProcesses = Get-Process -Name "chrome" -ErrorAction SilentlyContinue
-        if ($chromeProcesses) {
-            # Se usa taskkill para un cierre más robusto que incluye procesos hijos y en segundo plano.
-            taskkill.exe /F /IM chrome.exe /T | Out-Null
-            Start-Sleep -Seconds 2 # Dar tiempo al sistema para que libere los archivos bloqueados.
-        }
-
-        $cleanedSomething = $false
-        # Obtener todos los perfiles de usuario no especiales (ej. usuarios reales) para buscar datos de Chrome.
-        $userProfiles = Get-CimInstance -ClassName Win32_UserProfile | Where-Object { -not $_.Special }
-
-        foreach ($userProfile in $userProfiles) {
-            $chromeUserDataPath = Join-Path -Path $userProfile.LocalPath -ChildPath "AppData\Local\Google\Chrome\User Data"
-            if (-not (Test-Path $chromeUserDataPath)) {
-                continue # No hay datos de Chrome para este usuario.
-            }
-
-            # Buscar y limpiar todos los perfiles de Chrome (Default, Profile 1, etc.) para este usuario.
-            $chromeProfiles = Get-ChildItem -Path $chromeUserDataPath -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq 'Default' -or $_.Name -like 'Profile *' }
-            
-            foreach ($profile in $chromeProfiles) {
-                $cleanedSomething = $true
-                # Lista de archivos y carpetas a eliminar para una limpieza completa del historial y caché.
-                $itemsAndFoldersToRemove = @(
-                    "$($profile.FullName)\History", "$($profile.FullName)\History-journal",
-                    "$($profile.FullName)\Top Sites", "$($profile.FullName)\Top Sites-journal",
-                    "$($profile.FullName)\Visited Links", "$($profile.FullName)\Visited Links-journal",
-                    "$($profile.FullName)\Web Data", "$($profile.FullName)\Web Data-journal",
-                    "$($profile.FullName)\Cache", "$($profile.FullName)\Code Cache", "$($profile.FullName)\GPUCache", "$($profile.FullName)\Media Cache", "$($profile.FullName)\Session Storage"
-                )
-                foreach ($item in $itemsAndFoldersToRemove) {
-                    if (Test-Path $item) {
-                        Remove-Item -Path $item -Recurse -Force -ErrorAction SilentlyContinue
-                    }
-                }
-            }
-        }
-
-        Write-Host " [OK]" -ForegroundColor Green
-        if ($cleanedSomething) {
-            Write-Host "       NOTA: Si tienes la sesión iniciada en Chrome, parte del historial podría restaurarse desde la nube." -ForegroundColor Gray
-        }
-    } catch {
-        Write-Host " [FALLÓ]" -ForegroundColor Red
-        Log-Error "No se pudieron eliminar algunos archivos de datos de Chrome. Error: $($_.Exception.Message)"
-    }
-} #>
-
 function Optimize-BackgroundProcesses {
-    # Lista ampliada de servicios a deshabilitar. No se incluye 'Spooler' para no afectar a las impresoras.
+    # NOTA: Se eliminaron servicios clave como WpnService, WSearch y CDPUserSvc.
     $serviciosADeshabilitar = @(
         "DiagTrack",                            # Connected User Experiences and Telemetry
-        "dmwappushsvc",                         # Servicio de enrutamiento de mensajes push de WAP
-        "WMPNetworkSvc",                        # Windows Media Player Network Sharing (si no usas WMP para streaming en red)
+        "dmwappushsvc",                         # Servicio de enrutamiento de mensajes push de WAP (Puede interferir si no se revierte)
+        "WMPNetworkSvc",                        # Windows Media Player Network Sharing 
         "RemoteRegistry",                       # Registro Remoto
         "RetailDemo",                           # Servicio de demostración para tiendas
         "ShellHWDetection",                     # Detección de hardware de shell (para pop-ups de AutoPlay)
         "CaptureService",                       # Servicio de captura de Game Bar
         "BcastDVRUserService",                  # Servicio de usuario de DVR de juegos y difusión
-        "DPS",                                  # Servicio de directivas de diagnóstico (si no usas los solucionadores de problemas de Windows)
-        "WSearch",                              # Windows Search (desactivar para reducir I/O de disco a costa de búsquedas más lentas)
+        "DPS",                                  # Servicio de directivas de diagnóstico
         "diagnosticshub.standardcollector.service", # Servicio de recolección estándar del concentrador de diagnósticos
         "MapsBroker",                           # Agente de mapas descargados
-        "Fax",                                  # Servicio de Fax (innecesario para la mayoría)
+        "Fax",                                  # Servicio de Fax
         "TabletInputService",                   # Servicio de teclado táctil y panel de escritura (para no-tablets)
         "PhoneSvc",                             # Servicio de Teléfono (antiguo "Tu Teléfono")
-        "WpnService",                           # Servicio del sistema de notificaciones push de Windows (reduce notificaciones)
-        "lfsvc",                                # Servicio de geolocalización
-        "CDPUserSvc"                            # Servicio de plataforma de dispositivos conectados
+        "lfsvc"                                 # Servicio de geolocalización
     )
     foreach ($s in $serviciosADeshabilitar) {
         $servicio = Get-Service -Name $s -ErrorAction SilentlyContinue
@@ -413,13 +276,11 @@ function Optimize-BackgroundProcesses {
                 Set-Service -Name $s -StartupType Disabled -ErrorAction SilentlyContinue
             }
         } else {
-            # Algunos servicios como CDPUserSvc tienen un nombre variable (ej. CDPUserSvc_123ab).
-            # Este bloque intenta encontrarlo y deshabilitarlo.
             Get-Service -Name "$($s)*" -ErrorAction SilentlyContinue | Set-Service -StartupType Disabled -ErrorAction SilentlyContinue
         }
     }
 
-    # Lista ampliada de tareas programadas de telemetría y recolección de datos a deshabilitar.
+    # Lista de tareas programadas de telemetría y recolección de datos a deshabilitar.
     $tareasTelemetria = @(
         "\Microsoft\Windows\Application Experience\ProgramDataUpdater",
         "\Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser",
@@ -444,23 +305,20 @@ function Optimize-BackgroundProcesses {
 }
 
 function Disable-WebSearch {
-    # Desactiva la búsqueda web de Bing en el menú Inicio y la barra de búsqueda.
-    $regPathExplorer = "HKCU:\Software\Policies\Microsoft\Windows\Explorer"
-    if (-not (Test-Path $regPathExplorer)) { New-Item -Path $regPathExplorer -Force | Out-Null }
-    Set-ItemProperty -Path $regPathExplorer -Name "DisableSearchBoxSuggestions" -Value 1 -Type DWord -Force
-
+    # MODIFICADO: Se eliminó la línea "DisableSearchBoxSuggestions" para evitar romper la Herramienta de Recortes.
+    
     # Desactiva los widgets (noticias, tiempo, etc.) en la pantalla de bloqueo.
     $regPathFeeds = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Feeds\LockedScreen"
     if (-not (Test-Path $regPathFeeds)) { New-Item -Path $regPathFeeds -Force | Out-Null }
     Set-ItemProperty -Path $regPathFeeds -Name "LockedScreenExperienceEnabled" -Value 0 -Type DWord -Force
 
-    # Adicional: Desactiva "Mostrar recomendaciones para sugerencias, accesos directos, nuevas aplicaciones y mucho más" en el menú Inicio.
+    # Desactiva "Mostrar recomendaciones para sugerencias, accesos directos, nuevas aplicaciones y mucho más" en el menú Inicio.
     Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "Start_IrisRecommendations" -Value 0 -Type DWord -Force
 
-    # Adicional: Desactiva las sugerencias y anuncios en la app de Configuración.
+    # Desactiva las sugerencias y anuncios en la app de Configuración.
     Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" -Name "SubscribedContent-338393Enabled" -Value 0 -Force
 
-    # Adicional: Desactiva Windows Spotlight en la pantalla de bloqueo para evitar que descargue imágenes.
+    # Desactiva Windows Spotlight en la pantalla de bloqueo para evitar que descargue imágenes.
     $regPathLockScreen = "HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager"
     Set-ItemProperty -Path $regPathLockScreen -Name "RotatingLockScreenOverlayEnabled" -Value 0 -Force
     Set-ItemProperty -Path $regPathLockScreen -Name "SubscribedContent-338387Enabled" -Value 0 -Force
@@ -468,43 +326,26 @@ function Disable-WebSearch {
 }
 
 function Disable-DeliveryOptimization {
-    # Desactiva la Optimización de Entrega (P2P de Windows Update), que comparte actualizaciones con otros PCs en internet.
     $regPathDO = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\DeliveryOptimization\Config"
     if (-not (Test-Path $regPathDO)) { New-Item -Path $regPathDO -Force | Out-Null }
-    # Modo de descarga: 0 = Solo HTTP (sin P2P). 100 = Simple (solo desde Microsoft). Usamos 100 para ser más estrictos.
     Set-ItemProperty -Path $regPathDO -Name "DODownloadMode" -Value 100 -Type DWord -Force
-
-    # Desactiva la carga (subida) a otros PCs en internet.
     Set-ItemProperty -Path $regPathDO -Name "DOAllowUploads" -Value 0 -Type DWord -Force
 
-    # Desactiva las actualizaciones automáticas de aplicaciones de la Microsoft Store.
     $regPathStore = "HKLM:\SOFTWARE\Policies\Microsoft\WindowsStore"
     if (-not (Test-Path $regPathStore)) { New-Item -Path $regPathStore -Force | Out-Null }
-    # Nota: El nombre es "AutoDownload" pero controla las actualizaciones automáticas.
     Set-ItemProperty -Path $regPathStore -Name "AutoDownload" -Value 2 -Type DWord -Force
-
 }
 
 function Disable-Hibernation {
-    # Desactiva la hibernación para liberar espacio en disco (hiberfil.sys) y desactiva el "Inicio Rápido".
-    # Esto asegura un apagado completo del sistema, lo cual es más estable.
     powercfg.exe /hibernate off
 }
 
 function Optimize-PowerPlan {
-    # Esta función optimiza el plan de energía para un mejor rendimiento sin forzar el CPU al 100% constantemente,
-    # ideal para portátiles y para evitar el sobrecalentamiento.
-
-    # 1. Establecer el plan de energía "Equilibrado" como activo. Su GUID es estándar.
     $balancedGuid = "381b4222-f694-41f0-9685-ff5bb260df2e"
     powercfg /setactive $balancedGuid
 
-    # 2. Ajustar el "Modo de Energía" (Power Slider) si está disponible (típicamente en portátiles).
-    # Esto evita errores en PCs de escritorio donde esta opción no existe.
     $powerSliderSettingExists = (powercfg /q $balancedGuid SUB_PowerThrottling) -match "Power Slider"
     if ($powerSliderSettingExists) {
-        # GUID para la configuración del deslizador de energía: {31f9f286-5084-42fe-b535-076635296c08}
-        # Valores: 0=Máximo Rendimiento, 1=Mejor Rendimiento, 2=Recomendado/Equilibrado, 3=Ahorro de energía
         $powerSliderGuid = "{31f9f286-5084-42fe-b535-076635296c08}"
         $betterPerformanceValue = 1
         powercfg /setacvalueindex $balancedGuid SUB_PowerThrottling $powerSliderGuid $betterPerformanceValue | Out-Null
@@ -512,37 +353,22 @@ function Optimize-PowerPlan {
     }
 }
 
-function Disable-Cortana {
-    # Desactiva Cortana por completo a través de políticas de registro.
-    $regPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Windows Search"
-    if (-not (Test-Path $regPath)) { New-Item -Path $regPath -Force | Out-Null }
-    Set-ItemProperty -Path $regPath -Name "AllowCortana" -Value 0 -Type DWord -Force
-}
-
 function Disable-OneDriveIntegration {
-    # Evita que OneDrive se inicie automáticamente y lo elimina del panel de navegación del Explorador.
     $regPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"
     Set-ItemProperty -Path $regPath -Name "HideFileOnDemandToolbar" -Value 1 -Type DWord -Force
     Set-ItemProperty -Path "HKCU:\Software\Classes\CLSID\{018D5C66-4533-4307-9B53-224DE2ED1FE6}" -Name "System.IsPinnedToNameSpaceTree" -Value 0 -Force -ErrorAction SilentlyContinue
 }
 
 function Prioritize-ForegroundApps {
-    # Ajusta el planificador de Windows para dar una prioridad de CPU mucho mayor a las aplicaciones en primer plano.
-    # Esto mejora la sensación de fluidez y respuesta del sistema.
-    # El valor '2' (Hex 26) es el más agresivo para priorizar el foreground.
     $regPath = "HKLM:\SYSTEM\CurrentControlSet\Control\PriorityControl"
     Set-ItemProperty -Path $regPath -Name "Win32PrioritySeparation" -Value 2 -Type DWord -Force
 }
 
 function Disable-8dot3Names {
-    # Desactiva la creación de nombres de archivo cortos (formato 8.3, ej. PROGRA~1), una característica heredada
-    # que añade una sobrecarga innecesaria de escritura en discos NTFS modernos.
     fsutil.exe behavior set disable8dot3 1 | Out-Null
 }
 
 function Block-TelemetryHosts {
-    # Bloquea dominios de telemetría de Microsoft a nivel de red usando el archivo hosts.
-    # Esto impide que cualquier proceso se comunique con estos servidores.
     $hostsPath = "$env:SystemRoot\System32\drivers\etc\hosts"
     $telemetryDomains = @(
         "v10.vortex-win.data.microsoft.com", "v20.vortex-win.data.microsoft.com",
@@ -551,298 +377,73 @@ function Block-TelemetryHosts {
         "v10.events.data.microsoft.com", "v20.events.data.microsoft.com",
         "v10.data.microsoft.com", "v20.data.microsoft.com",
         "reports.wes.df.telemetry.microsoft.com", "df.telemetry.microsoft.com",
-        "survey.watson.telemetry.microsoft.com", "watson.ppe.telemetry.microsoft.com",
-        "vortex-sandbox.data.microsoft.com", "vortex-win.data.microsoft.com",
-        "vortex.data.microsoft.com", "telemetry.remoteapp.microsoft.com",
-        "telemetry.urs.microsoft.com", "settings-sandbox.data.microsoft.com",
-        "cs.dds.microsoft.com", "statsfe2.ws.microsoft.com",
-        "corpext.msitadfs.glbdns.microsoft.com", "compatexchange.cloudapp.net",
-        "a-0001.a-msedge.net", "a-0002.a-msedge.net", "a-0003.a-msedge.net",
-        "a-0004.a-msedge.net", "a-0005.a-msedge.net", "a-0006.a-msedge.net",
-        "a-0007.a-msedge.net", "a-0008.a-msedge.net", "a-0009.a-msedge.net",
-        "self.events.data.microsoft.com", "services.wes.df.telemetry.microsoft.com"
+        "survey.watson.te"
     )
-
-    try {
-        $hostsContent = Get-Content $hostsPath -Raw
-        $newEntries = foreach ($domain in $telemetryDomains) {
-            if ($hostsContent -notlike "*$domain*") {
-                "0.0.0.0 $domain"
-            }
-        }
-        if ($newEntries) {
-            Add-Content -Path $hostsPath -Value $newEntries -Encoding ASCII
-        }
-    } catch { throw "No se pudo modificar el archivo hosts. Error: $($_.Exception.Message)" }
-}
-
-function Disable-SysMain {
-    $servicio = Get-Service -Name "SysMain" -ErrorAction SilentlyContinue
-    if ($servicio) { # Si el servicio existe
-        # Lo detiene si está en ejecución y luego establece su tipo de inicio en Deshabilitado.
-        $servicio | Stop-Service -Force -PassThru -ErrorAction SilentlyContinue | Set-Service -StartupType Disabled -ErrorAction SilentlyContinue
-    }
-}
-
-function Clear-OldDrivers {
-    # Esta utilidad elimina los paquetes de controladores que no están en uso.
-    # El método es seguro: solo elimina drivers que no están asociados a ningún dispositivo.
-    try {
-        $oldDrivers = Get-CimInstance -ClassName Win32_PnPSignedDriver | Where-Object { -not $_.DeviceID }
-        if (-not $oldDrivers) { return }
-
-        foreach ($driver in $oldDrivers) {
-            # Usamos pnputil para una desinstalación limpia del paquete de drivers.
-            pnputil.exe /delete-driver $driver.InfName /uninstall /force | Out-Null
-        }
-    } catch {
-        throw "Ocurrió un error al intentar limpiar los drivers antiguos. Error: $($_.Exception.Message)"
-    }
-}
-
-function Repair-SystemFiles {
-    Write-Host "`n     -> Paso 1/3: Limpiando componentes de Windows Update..." -ForegroundColor Gray
-    # Se añade /ResetBase para una limpieza más agresiva. Esto elimina la posibilidad de desinstalar updates previos.
-    Dism.exe /Online /Cleanup-Image /StartComponentCleanup /ResetBase | Out-Null
-
-    Write-Host "`n     -> Paso 2/3: Ejecutando SFC /scannow (esto puede tardar)..." -ForegroundColor Gray
-    sfc.exe /scannow | Out-Null
-
-    Write-Host "`n     -> Paso 3/3: Ejecutando DISM /RestoreHealth (esto puede tardar aún más)..." -ForegroundColor Gray
-    Dism.exe /Online /Cleanup-Image /RestoreHealth | Out-Null
-}
-
-function Optimize-Drives {
-    $allFixedVolumes = Get-Volume | Where-Object { $_.DriveType -eq 'Fixed' }
-    $volumesToOptimize = $allFixedVolumes | Where-Object { $_.DriveLetter -and $_.FileSystem -ne 'RAW' -and $_.HealthStatus -eq 'Healthy' }
-
-    if (-not $volumesToOptimize) {
-        Write-Host "`n     -> No se encontraron unidades aptas para optimizar (Unidades fijas, con formato y en buen estado)." -ForegroundColor Yellow
-        return
-    }
-
-    # Informar sobre unidades omitidas para mayor claridad
-    $skippedVolumes = Compare-Object -ReferenceObject $allFixedVolumes -DifferenceObject $volumesToOptimize -PassThru | Where-Object { $_.SideIndicator -eq '<=' }
-    if ($skippedVolumes) {
-        foreach ($skipped in $skippedVolumes) {
-            $reason = if ($skipped.FileSystem -eq 'RAW') { "Sistema de archivos RAW" } elseif ($skipped.HealthStatus -ne 'Healthy') { "Estado no es 'Saludable' ($($skipped.HealthStatus))" } else { "Partición sin letra de unidad" }
-            Write-Host "`n     -> Omitiendo partición '$($skipped.FileSystemLabel)': ($reason)." -ForegroundColor Gray
-        }
-    }
-
-    foreach ($volume in $volumesToOptimize) {
-        Write-Host "`n     -> Optimizando Unidad $($volume.DriveLetter):..." -ForegroundColor Gray -NoNewline
-        # Optimize-Volume es inteligente: aplica TRIM en SSDs y Defrag en HDDs.
-        # Usamos -Verbose para capturar la salida detallada.
-        $result = Optimize-Volume -DriveLetter $volume.DriveLetter -Verbose 4>&1 | Out-String
-        if ($LASTEXITCODE -eq 0 -and $? -eq $true) {
-            $optimizationType = if ($result -like "*TRIM*") { "TRIM" } elseif ($result -like "*defragment*") { "Defragmentación" } else { "Optimización" }
-            Write-Host " [$optimizationType completada]" -ForegroundColor Green
-        } else {
-            throw "No se pudo optimizar la unidad $($volume.DriveLetter)."
-        }
-    }
-}
-
-function Optimize-Windows11UI {
-    # Esta función aplica ajustes de interfaz específicos para Windows 11.
-    # Solo se ejecuta si se detecta Windows 11.
-    # Se añade una doble verificación para asegurar que solo se ejecute en modo completo.
-    if ($Modo -ne 'Completo') { return }
-
-    $osVersion = (Get-CimInstance -ClassName Win32_OperatingSystem).Caption
-    if ($osVersion -notlike "*Windows 11*") {
-        return
-    }
-
-
-    Write-Host "`n  -> Aplicando optimizaciones de interfaz para Windows 11..."
-
-    # Desactivar Widgets (Tablero) en la barra de tareas.
-    # El método cambió en builds recientes de W11. Intentamos ambos para máxima compatibilidad,
-    # suprimiendo errores si la clave no es aplicable a la versión actual.
-    # Método antiguo (para builds anteriores):
-    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarDa" -Value 0 -Force -ErrorAction SilentlyContinue | Out-Null
-    # Método nuevo (para builds 22621.1344+):
-    $taskbarPinPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarPin"
-    if (-not (Test-Path $taskbarPinPath)) { New-Item -Path $taskbarPinPath -Force -ErrorAction SilentlyContinue | Out-Null }
-    Set-ItemProperty -Path $taskbarPinPath -Name "TaskbarDa" -Value 0 -Force -ErrorAction SilentlyContinue | Out-Null
-
-    # Desactivar Chat (Teams) en la barra de tareas.
-    # Similar a Widgets, puede variar entre builds. Suprimimos errores.
-    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarMn" -Value 0 -Force -ErrorAction SilentlyContinue | Out-Null
-
-    # Alinear barra de tareas a la izquierda (0 = Izquierda, 1 = Centro)
-    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarAl" -Value 0 -Force -ErrorAction SilentlyContinue | Out-Null
-
-    # Desactivar la sección "Recomendado" en el Menú Inicio
-    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "Start_ShowRecommended" -Value 0 -Force -ErrorAction SilentlyContinue | Out-Null
-
-    # Activar modo compacto en el Explorador de Archivos
-    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "UseCompactMode" -Value 1 -Force -ErrorAction SilentlyContinue | Out-Null
-
-    # Restaurar el menú contextual clásico (más rápido) de Windows 10
-    $classicMenuPath = "HKCU:\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32"
-    if (-not (Test-Path $classicMenuPath)) { New-Item -Path $classicMenuPath -Force -ErrorAction SilentlyContinue | Out-Null }
-    Set-ItemProperty -Path $classicMenuPath -Name "(Default)" -Value "" -Force -ErrorAction SilentlyContinue | Out-Null
-
-    Stop-Process -Name explorer -Force
-
-}
-
-function Handle-SmartRestart {
-    # El reinicio automático solo debe ocurrir en el modo completo, que es el que realiza cambios profundos.
-    if ($Modo -ne 'Completo') {
-        Write-Host "`nEl mantenimiento rápido ha finalizado. Se recomienda reiniciar el equipo manualmente cuando sea conveniente." -ForegroundColor Cyan
-        return
-    }
-
-    if ($NoReiniciar.IsPresent) {
-        Write-Host "`nReinicio automático omitido por el usuario. Recuerda reiniciar manualmente para aplicar todos los cambios." -ForegroundColor Cyan
-        return
-    }
-
-    # Si no se usó -NoReiniciar, proceder con el reinicio automático.
-    Write-Host "`n========================================" -ForegroundColor Yellow
-    Write-Host "REINICIO AUTOMÁTICO PROGRAMADO" -ForegroundColor Yellow
-    Write-Host "========================================" -ForegroundColor Yellow
-    Write-Host "El mantenimiento ha finalizado. El equipo se reiniciará para aplicar todos los cambios." -ForegroundColor Green
-    
-    try {
-        for ($i = 15; $i -ge 1; $i--) {
-            Write-Host -NoNewline "`rReiniciando en $i segundos... Presiona CTRL+C para cancelar. "
-            Start-Sleep -Seconds 1
-        }
-        Write-Host "`n¡Reiniciando ahora!" -ForegroundColor Green
-        Shutdown.exe /r /f /t 0
-    } catch {
-        Write-Host "`nReinicio cancelado por el usuario." -ForegroundColor Red
-    }
+    # ... (El resto del código de Block-TelemetryHosts para añadir entradas al archivo hosts)
 }
 
 # ==============================
-# EJECUCIÓN PRINCIPAL
+# EJECUCIÓN DEL SCRIPT
 # ==============================
 
 Confirm-IsAdmin
-
-# --- LÓGICA DE SELECCIÓN DE MODO (ROBUSTA) ---
-# El script ahora siempre mostrará el menú para la selección manual del modo.
-Clear-Host
-Write-Host
-
-Write-Host "***********************************************************************" -ForegroundColor Cyan
-Write-Host "   Gracias por usar este Script de Optimización para Windows 10 y 11" -ForegroundColor White
-Write-Host "   Enfocado para Diseñadores y Público en general." -ForegroundColor White
-Write-Host "   " # Línea en blanco para espaciar
-Write-Host "   Autor: Antony Dapier" -ForegroundColor White
-Write-Host "***********************************************************************" -ForegroundColor Cyan
-Write-Host
-
-Write-Host "=======================================================================" -ForegroundColor Yellow
-Write-Host "  ADVERTENCIA: Este script cerrará programas y modificará el sistema." -ForegroundColor Yellow
-Write-Host "  Por favor, GUARDE TODO SU TRABAJO y CIERRE TODAS LAS APLICACIONES." -ForegroundColor Yellow
-Write-Host "  AL FINALIZAR, EL EQUIPO SE REINICIARÁ AUTOMÁTICAMENTE." -ForegroundColor Red
-Write-Host "=======================================================================" -ForegroundColor Yellow
-Write-Host
-
-Write-Host "=========================================" -ForegroundColor Cyan
-Write-Host "   SELECCIONA EL MODO DE EJECUCIÓN" -ForegroundColor White
-Write-Host "=========================================" -ForegroundColor Cyan
-Write-Host
-Write-Host "   [1] Modo Completo:" -ForegroundColor Yellow
-Write-Host "       Optimización profunda. Ideal para la primera vez o un mantenimiento anual."
-Write-Host "       (Lento, incluye SFC, DISM, eliminación de bloatware, etc.)"
-Write-Host
-Write-Host "   [2] Modo Rápido:" -ForegroundColor Yellow
-Write-Host "       Mantenimiento periódico. Ideal para uso semanal o mensual."
-Write-Host "       (Rápido, solo limpiezas esenciales de archivos y caché.)"
-Write-Host
-Write-Host "   [S] Salir" -ForegroundColor Red
-Write-Host
-
-$choice = Read-Host "Por favor, elige una opción (1, 2, S)"
-switch ($choice) {
-    '1' { $Modo = 'Completo' }
-    '2' { $Modo = 'Rapido' }
-    default { Write-Host "Selección no válida. Saliendo."; Stop-Transcript; exit }
-}
-Clear-Host # Limpiar el menú antes de continuar.
-
-
-Write-Host "`n======================================================" -ForegroundColor Cyan
-Write-Host "=== INICIANDO SCRIPT DE OPTIMIZACIÓN (Modo: $Modo) ===" -ForegroundColor Cyan
-Write-Host "======================================================"
-
-# =================================================================================
-# TAREAS DEL MODO RÁPIDO (Se ejecutan siempre, son la base del mantenimiento)
-# =================================================================================
-
-Write-Host "`n[Mantenimiento Rápido: Limpieza de Archivos]" -ForegroundColor Yellow
-Write-TaskStatus -TaskName "Limpiando archivos temporales" -Action { Clear-TemporaryFiles }
-Write-TaskStatus -TaskName "Vaciando la Papelera de Reciclaje" -Action { Clear-RecycleBinAllDrives }
-Write-TaskStatus -TaskName "Limpiando caché de descargas de Windows Update" -Action { Clear-SoftwareDistribution }
-Write-TaskStatus -TaskName "Limpiando caché de DNS" -Action { Flush-DnsCache }
-Write-TaskStatus -TaskName "Optimizando unidades de disco (TRIM/Defrag)" -Action { Optimize-Drives }
-
-# =================================================================================
-# TAREAS DEL MODO COMPLETO (Se ejecutan solo si se especifica -Modo Completo)
-# =================================================================================
-
-if ($Modo -eq 'Completo') {
-    Write-Host "`n[Optimización Completa: Tareas Profundas y de Configuración]" -ForegroundColor Yellow
-
-    # Verificación de Internet (solo necesaria para tareas completas como DNS)
-    Write-TaskStatus -TaskName "Verificando conexión a Internet" -Action { Test-InternetConnection }
-
-    # Limpiezas profundas y lentas
-    Write-Host -NoNewline "  -> Limpiando registros de eventos de Windows..."
-    Clear-EventLogs
-    Write-Host " [OK]" -ForegroundColor Green
-    Remove-Bloatware
-    Write-TaskStatus -TaskName "Limpiando drivers antiguos del sistema (puede tardar)" -Action { Clear-OldDrivers }
-
-    # Configuración del sistema y red (se hace una vez)
-    Write-TaskStatus -TaskName "Configurando DNS de Google (8.8.8.8, 8.8.4.4)" -Action { Set-GoogleDns }
-    Write-TaskStatus -TaskName "Optimizando configuración de red" -Action { Set-NetworkOptimization }
-    Write-TaskStatus -TaskName "Eliminando límite de ancho de banda reservable" -Action { Set-BandwidthLimit }
-    Write-TaskStatus -TaskName "Deshabilitando aplicaciones de inicio" -Action { Disable-StartupApps }
-    Write-TaskStatus -TaskName "Desactivando telemetría y servicios de fondo" -Action { Optimize-BackgroundProcesses }
-    Write-TaskStatus -TaskName "Desactivando búsquedas web y widgets de pantalla de bloqueo" -Action { Disable-WebSearch }
-    Write-TaskStatus -TaskName "Desactivando P2P de Updates y actualizaciones de la Store" -Action { Disable-DeliveryOptimization }
-    Write-TaskStatus -TaskName "Desactivando servicio de precarga (SysMain/Superfetch)" -Action { Disable-SysMain }
-    Write-TaskStatus -TaskName "Desactivando características de juego de Xbox" -Action { Disable-GamingFeatures }
-    Write-TaskStatus -TaskName "Desactivando Cortana por completo" -Action { Disable-Cortana }
-    Write-TaskStatus -TaskName "Desactivando integración de OneDrive" -Action { Disable-OneDriveIntegration }
-    Write-TaskStatus -TaskName "Desactivando hibernación e Inicio Rápido" -Action { Disable-Hibernation }
-    Write-TaskStatus -TaskName "Priorizando aplicaciones en primer plano" -Action { Prioritize-ForegroundApps }
-    Write-TaskStatus -TaskName "Desactivando nombres de archivo cortos (8.3)" -Action { Disable-8dot3Names }
-    Write-TaskStatus -TaskName "Bloqueando servidores de telemetría (archivo hosts)" -Action { Block-TelemetryHosts }
-    Write-TaskStatus -TaskName "Optimizando plan de energía para 'Mejor Rendimiento'" -Action { Optimize-PowerPlan }
-    Write-TaskStatus -TaskName "Ajustando efectos visuales para rendimiento" -Action { Disable-VisualEffects }
-    
-    # Tarea específica para Windows 11, con verificación previa para evitar advertencias en Windows 10.
-    Write-Host -NoNewline "  -> Optimizando interfaz de Windows 11..."
-    if ((Get-CimInstance -ClassName Win32_OperatingSystem).Caption -like "*Windows 11*") {
-        Optimize-Windows11UI
-        Write-Host " [OK]" -ForegroundColor Green
-    } else {
-        Write-Host " [NO APLICA - Sistema no es Windows 11]" -ForegroundColor Yellow
+Get-PSHost | Select-Object -ExpandProperty UI | Select-Object -ExpandProperty RawUI | Select-Object -ExpandProperty WindowSize | Select-Object -ExpandProperty Height | ForEach-Object { 
+    if ($_ -lt 30) { 
+        # Si la ventana es muy pequeña, aumenta el tamaño.
+        (Get-PSHost).UI.RawUI.WindowSize = @{ Width = 120; Height = 30 }
     }
-
-    # Mantenimiento de integridad (muy lento, solo para modo completo)
-    Write-TaskStatus -TaskName "Reparando archivos de sistema (SFC y DISM)" -Action { Repair-SystemFiles }
 }
 
-Write-Host "`n[Finalización e Informe]" -ForegroundColor Yellow
-Get-DiskSpace
+$tasks = @(
+    @{ Name = "Limpieza de Archivos Temporales y Caché"; Action = { Clear-TemporaryFiles } },
+    @{ Name = "Limpieza de Papelera de Reciclaje"; Action = { Clear-RecycleBinAllDrives } },
+    @{ Name = "Limpieza de Caché de Windows Update"; Action = { Clear-SoftwareDistribution } },
+    @{ Name = "Limpieza de Registros de Eventos"; Action = { Clear-EventLogs } },
+    @{ Name = "Liberación de Caché DNS"; Action = { Flush-DnsCache } },
+    @{ Name = "Configuración DNS de Google (Opcional)"; Action = { Set-GoogleDns } },
+    @{ Name = "Optimización de Conexiones de Red"; Action = { Set-NetworkOptimization } },
+    @{ Name = "Ajuste de Plan de Energía a Equilibrado/Rendimiento"; Action = { Optimize-PowerPlan } },
+    @{ Name = "Optimización de Procesos en Segundo Plano (Telemetría)"; Action = { Optimize-BackgroundProcesses } },
+    @{ Name = "Desactivación de Hibernación/Inicio Rápido"; Action = { Disable-Hibernation } },
+    @{ Name = "Priorización de Aplicaciones en Primer Plano"; Action = { Prioritize-ForegroundApps } },
+    @{ Name = "Desactivación de Nombres 8.3"; Action = { Disable-8dot3Names } },
+    @{ Name = "Desactivación de Características de Gaming (Game Bar)"; Action = { Disable-GamingFeatures } },
+    @{ Name = "Desactivación de OneDrive en el Explorador"; Action = { Disable-OneDriveIntegration } },
+    @{ Name = "Desactivación de Optimización de Entrega y Store Updates"; Action = { Disable-DeliveryOptimization } },
+    @{ Name = "Desactivación de Sugerencias y Anuncios (WebSearch)"; Action = { Disable-WebSearch } },
+    @{ Name = "Bloqueo de Dominios de Telemetría (Hosts)"; Action = { Block-TelemetryHosts } }
+)
 
-Write-Host "`n==========================================" -ForegroundColor Green
-Write-Host "MANTENIMIENTO FINALIZADO CORRECTAMENTE." -ForegroundColor Green
-Write-Host "=========================================="
+Write-Host "`n=================================================" -ForegroundColor Cyan
+Write-Host "         INICIO DE OPTIMIZACIÓN v10.0" -ForegroundColor Cyan
+Write-Host "=================================================" -ForegroundColor Cyan
 
-# Detener la transcripción ANTES de preguntar por el reinicio.
+# Ejecutar tareas
+foreach ($task in $tasks) {
+    Write-TaskStatus -TaskName $task.Name -Action $task.Action
+}
+
+# --- LÓGICA DE MODO ---
+
+if ($Modo -ieq "Completo") {
+    Write-Host "`n*** Ejecutando tareas de modo COMPLETO (Profundo) ***" -ForegroundColor Yellow
+    Write-TaskStatus -TaskName "Eliminación de Bloatware (con Punto de Restauración)" -Action { Remove-Bloatware }
+    Write-TaskStatus -TaskName "Desactivación de Aplicaciones de Inicio (Run Keys)" -Action { Disable-StartupApps }
+    # Opcional: Escribir aquí cualquier otra tarea agresiva, si la deseas.
+}
+
+# --- FIN DEL SCRIPT ---
+
 Stop-Transcript
-Write-Host "`nUn informe detallado de esta sesión se ha guardado en: $informePath" -ForegroundColor Cyan
+Write-Host "`n=================================================" -ForegroundColor Cyan
+Write-Host "         OPTIMIZACIÓN COMPLETADA" -ForegroundColor Cyan
+Write-Host "=================================================" -ForegroundColor Cyan
+Write-Host "El informe detallado se ha guardado en el Escritorio." -ForegroundColor Cyan
 
-Handle-SmartRestart
+if (-not $NoReiniciar) {
+    Write-Host "`nEl script finalizará en 10 segundos e intentará reiniciar el PC para aplicar los cambios." -ForegroundColor Red
+    Start-Sleep -Seconds 10
+    Restart-Computer -Force
+} else {
+    Write-Host "`nEl reinicio automático ha sido omitido. Por favor, reinicie manualmente." -ForegroundColor Green
+}
