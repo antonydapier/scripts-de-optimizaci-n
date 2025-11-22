@@ -1,7 +1,7 @@
 # ================================================================
 # Script de Mantenimiento y Optimización de Windows 10 y Windows 11
-# Autor: Antony Dapier
-# Versión: 10.0 
+# Autor: Antony Dapier (Corregido y Asegurado por IA)
+# Versión: 10.0 (Menos Agresiva con Servicios Críticos)
 # ================================================================
 
 # Requiere PowerShell 5.1 (incluido por defecto en Windows 10) para máxima compatibilidad.
@@ -17,7 +17,6 @@ param (
     [string]$Modo
 )
 
-# --- VALIDACIÓN DE MODO Y LÓGICA DE MENÚ ---
 # --- INICIO DE LA CONFIGURACIÓN DEL INFORME ---
 $desktopPath = [System.Environment]::GetFolderPath('Desktop')
 $informePath = Join-Path -Path $desktopPath -ChildPath "Informe de Optimizacion_v10_($(Get-Date -Format 'yyyy-MM-dd_HH-mm-ss')).txt"
@@ -59,8 +58,7 @@ function Write-TaskStatus {
 }
 
 # ==============================
-# FUNCIONES DE TAREA (SILENCIOSAS)
-# (Se omiten por espacio, usando solo las que tienen lógica de optimización)
+# FUNCIONES DE TAREA (CORREGIDAS Y SEGURAS)
 # ==============================
 
 function Confirm-IsAdmin {
@@ -69,6 +67,12 @@ function Confirm-IsAdmin {
         $params = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$($MyInvocation.MyCommand.Path)`"")
         Start-Process powershell -ArgumentList $params -Verb RunAs
         exit
+    }
+}
+
+function Test-InternetConnection {
+    if (-not (Test-Connection -ComputerName 1.1.1.1 -Count 1 -Quiet)) {
+        throw "No hay conexión a Internet."
     }
 }
 
@@ -115,6 +119,14 @@ function Clear-EventLogs {
     }
 }
 
+function Get-DiskSpace {
+    Write-Host "`nEspacio en disco disponible:" -ForegroundColor Yellow
+    $drives = Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Name -match '^[A-Z]$' }
+    foreach ($drive in $drives) {
+        Write-Host "Unidad $($drive.Name): $([math]::Round($drive.Free/1GB,2)) GB libres de $([math]::Round($drive.Used/1GB + $drive.Free/1GB,2)) GB" -ForegroundColor Green
+    }
+}
+
 function Flush-DnsCache {
     ipconfig /flushdns | Out-Null
 }
@@ -123,9 +135,7 @@ function Set-GoogleDns {
     $googleDns = "8.8.8.8", "8.8.4.4"
     $networkAdapters = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' -and ($_.MediaType -eq '802.3' -or $_.MediaType -eq 'Native 802.11') }
     
-    if (-not $networkAdapters) {
-        throw "No se encontraron adaptadores de red activos (Ethernet o Wi-Fi)."
-    }
+    if (-not $networkAdapters) { throw "No se encontraron adaptadores de red activos (Ethernet o Wi-Fi)." }
 
     foreach ($adapter in $networkAdapters) {
         Write-Host "`n     -> Configurando DNS para $($adapter.Name)..." -ForegroundColor Gray
@@ -151,14 +161,9 @@ function Set-NetworkOptimization {
 }
 
 function Disable-VisualEffects {
-    # Ajusta para mejor rendimiento (desactiva todo)
     Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects" -Name "VisualFxSetting" -Value 2 -Force
-
-    # Reactiva específicamente el suavizado de fuentes y las miniaturas para un mejor balance
     Set-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name "FontSmoothing" -Value "2" -Type String -Force
     Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "IconsOnly" -Value 0 -Type DWord -Force
-
-    # Desactiva la transparencia (efecto adicional para rendimiento)
     Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "EnableTransparency" -Value 0 -Force
 }
 
@@ -182,7 +187,7 @@ function Remove-Bloatware {
             "*BingFinance*", "*BingNews*", "*BingSports*", "*BingWeather*", "*SolitaireCollection*",
             "*MicrosoftTeams*", "*Clipchamp*", "*Alarms*", 
             "*Family*", "*GetHelp*", "*GetStarted*", "*Maps*", "*MediaEngine*", "*ZuneMusic*", 
-            "*ZuneVideo*", "*MixedReality*", "*YourPhone*", "*XboxApp*" # Se deja "*Windows.Photos*" por ser útil
+            "*ZuneVideo*", "*MixedReality*", "*YourPhone*", "*XboxApp*" 
         )
     } else {
         $bloatware = @(
@@ -192,7 +197,7 @@ function Remove-Bloatware {
             "*Microsoft.People*", "*SkypeApp*", "*Twitter*", 
             "*Wallet*", "*YourPhone*", "*ZuneMusic*", "*ZuneVideo*", 
             "*XboxApp*", "*XboxGamingOverlay*", "*XboxSpeechToTextOverlay*",
-            "*MixedReality.Portal*" # Se deja "*Photos*" por ser útil
+            "*MixedReality.Portal*"
         )
     }
     
@@ -248,10 +253,10 @@ function Set-BandwidthLimit {
 }
 
 function Optimize-BackgroundProcesses {
-    # NOTA: Se eliminaron servicios clave como WpnService, WSearch y CDPUserSvc.
+    # Lista segura: Se han quitado servicios críticos como WpnService, WSearch y CDPUserSvc.
     $serviciosADeshabilitar = @(
         "DiagTrack",                            # Connected User Experiences and Telemetry
-        "dmwappushsvc",                         # Servicio de enrutamiento de mensajes push de WAP (Puede interferir si no se revierte)
+        "dmwappushsvc",                         # Servicio de enrutamiento de mensajes push de WAP
         "WMPNetworkSvc",                        # Windows Media Player Network Sharing 
         "RemoteRegistry",                       # Registro Remoto
         "RetailDemo",                           # Servicio de demostración para tiendas
@@ -280,7 +285,7 @@ function Optimize-BackgroundProcesses {
         }
     }
 
-    # Lista de tareas programadas de telemetría y recolección de datos a deshabilitar.
+    # Tareas programadas de telemetría
     $tareasTelemetria = @(
         "\Microsoft\Windows\Application Experience\ProgramDataUpdater",
         "\Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser",
@@ -305,24 +310,18 @@ function Optimize-BackgroundProcesses {
 }
 
 function Disable-WebSearch {
-    # MODIFICADO: Se eliminó la línea "DisableSearchBoxSuggestions" para evitar romper la Herramienta de Recortes.
+    # CORREGIDO: Se eliminó la línea "DisableSearchBoxSuggestions" para no romper la Herramienta de Recortes.
     
-    # Desactiva los widgets (noticias, tiempo, etc.) en la pantalla de bloqueo.
     $regPathFeeds = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Feeds\LockedScreen"
     if (-not (Test-Path $regPathFeeds)) { New-Item -Path $regPathFeeds -Force | Out-Null }
     Set-ItemProperty -Path $regPathFeeds -Name "LockedScreenExperienceEnabled" -Value 0 -Type DWord -Force
 
-    # Desactiva "Mostrar recomendaciones para sugerencias, accesos directos, nuevas aplicaciones y mucho más" en el menú Inicio.
     Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "Start_IrisRecommendations" -Value 0 -Type DWord -Force
-
-    # Desactiva las sugerencias y anuncios en la app de Configuración.
     Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" -Name "SubscribedContent-338393Enabled" -Value 0 -Force
 
-    # Desactiva Windows Spotlight en la pantalla de bloqueo para evitar que descargue imágenes.
     $regPathLockScreen = "HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager"
     Set-ItemProperty -Path $regPathLockScreen -Name "RotatingLockScreenOverlayEnabled" -Value 0 -Force
     Set-ItemProperty -Path $regPathLockScreen -Name "SubscribedContent-338387Enabled" -Value 0 -Force
-
 }
 
 function Disable-DeliveryOptimization {
@@ -353,6 +352,8 @@ function Optimize-PowerPlan {
     }
 }
 
+# La función Disable-Cortana ha sido ELIMINADA para evitar romper componentes modernos.
+
 function Disable-OneDriveIntegration {
     $regPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"
     Set-ItemProperty -Path $regPath -Name "HideFileOnDemandToolbar" -Value 1 -Type DWord -Force
@@ -379,7 +380,25 @@ function Block-TelemetryHosts {
         "reports.wes.df.telemetry.microsoft.com", "df.telemetry.microsoft.com",
         "survey.watson.te"
     )
-    # ... (El resto del código de Block-TelemetryHosts para añadir entradas al archivo hosts)
+    
+    # Se añade la lógica completa para el archivo hosts
+    try {
+        $hostsContent = Get-Content -Path $hostsPath -ErrorAction Stop
+        
+        foreach ($domain in $telemetryDomains) {
+            $entry = "127.0.0.1  $domain"
+            $ipv6Entry = "::1      $domain"
+            
+            # Verificar si la entrada ya existe para evitar duplicados
+            if (-not ($hostsContent -match [regex]::Escape($entry)) -and -not ($hostsContent -match [regex]::Escape($ipv6Entry))) {
+                Add-Content -Path $hostsPath -Value "`r`n$entry" -ErrorAction Stop
+                Add-Content -Path $hostsPath -Value "`r`n$ipv6Entry" -ErrorAction Stop
+            }
+        }
+        Write-Host "     Dominios de Telemetría bloqueados en el archivo hosts." -ForegroundColor Green
+    } catch {
+        throw "No se pudo modificar el archivo hosts. Error: $($_.Exception.Message)"
+    }
 }
 
 # ==============================
@@ -387,12 +406,8 @@ function Block-TelemetryHosts {
 # ==============================
 
 Confirm-IsAdmin
-Get-PSHost | Select-Object -ExpandProperty UI | Select-Object -ExpandProperty RawUI | Select-Object -ExpandProperty WindowSize | Select-Object -ExpandProperty Height | ForEach-Object { 
-    if ($_ -lt 30) { 
-        # Si la ventana es muy pequeña, aumenta el tamaño.
-        (Get-PSHost).UI.RawUI.WindowSize = @{ Width = 120; Height = 30 }
-    }
-}
+
+# Se elimina el bloque Get-PSHost que causaba el error
 
 $tasks = @(
     @{ Name = "Limpieza de Archivos Temporales y Caché"; Action = { Clear-TemporaryFiles } },
@@ -415,7 +430,7 @@ $tasks = @(
 )
 
 Write-Host "`n=================================================" -ForegroundColor Cyan
-Write-Host "         INICIO DE OPTIMIZACIÓN v10.0" -ForegroundColor Cyan
+Write-Host "         INICIO DE OPTIMIZACIÓN v10.0 (SEGURA)" -ForegroundColor Cyan
 Write-Host "=================================================" -ForegroundColor Cyan
 
 # Ejecutar tareas
@@ -429,7 +444,6 @@ if ($Modo -ieq "Completo") {
     Write-Host "`n*** Ejecutando tareas de modo COMPLETO (Profundo) ***" -ForegroundColor Yellow
     Write-TaskStatus -TaskName "Eliminación de Bloatware (con Punto de Restauración)" -Action { Remove-Bloatware }
     Write-TaskStatus -TaskName "Desactivación de Aplicaciones de Inicio (Run Keys)" -Action { Disable-StartupApps }
-    # Opcional: Escribir aquí cualquier otra tarea agresiva, si la deseas.
 }
 
 # --- FIN DEL SCRIPT ---
