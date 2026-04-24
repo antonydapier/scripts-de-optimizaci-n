@@ -97,10 +97,11 @@ function Clear-SoftwareDistribution {
     if ($wasRunning) { Start-Service -Name wuauserv -ErrorAction SilentlyContinue }
 }
 function Clear-EventLogs {
-    $logs = Get-WinEvent -ListLog * -ErrorAction SilentlyContinue
-    if (-not $logs) { return }
+    # Método más rápido y silencioso para limpiar logs
+    $logs = wevtutil.exe el
     foreach ($log in $logs) {
-        try { wevtutil.exe cl $log.LogName 2>$null } catch {}
+        # Redirigimos error y salida a null para evitar mensajes de "Acceso denegado" en logs protegidos
+        & wevtutil.exe cl "$log" >$null 2>&1
     }
 }
 function Flush-DnsCache { ipconfig /flushdns | Out-Null }
@@ -296,13 +297,18 @@ function Block-TelemetryHosts {
     )
     $newEntries = @()
     try {
+        # Verificar si el archivo es de solo lectura
+        if ((Get-Item $hostsPath).IsReadOnly) {
+            Set-ItemProperty -Path $hostsPath -Name IsReadOnly -Value $false
+        }
+
         $hostsContent = Get-Content -Path $hostsPath -ErrorAction Stop
         foreach ($domain in $telemetryDomains) {
             $entry = "127.0.0.1  $domain"
             $ipv6Entry = "::1      $domain"
             if (-not ($hostsContent -match [regex]::Escape($entry)) -and -not ($hostsContent -match [regex]::Escape($ipv6Entry))) {
-                $newEntries += "`r`n$entry"
-                $newEntries += "`r`n$ipv6Entry"
+                $newEntries += "$entry"
+                $newEntries += "$ipv6Entry"
             }
         }
         if ($newEntries.Count -gt 0) {
@@ -310,7 +316,7 @@ function Block-TelemetryHosts {
         }
         Write-Host "     Archivo hosts verificado/actualizado." -ForegroundColor Green
     } catch {
-        throw "El archivo hosts está bloqueado (posiblemente por el Antivirus o Windows Defender)."
+        Write-Warning "El archivo hosts no pudo ser modificado. Es muy probable que tu Antivirus (o Windows Defender) esté bloqueando el acceso por seguridad."
     }
 }
 
@@ -327,6 +333,11 @@ if (-not $Modo) {
     Write-Host "=================================================" -ForegroundColor Yellow
     Write-Host "1) Rapido: Mantenimiento (temporales, papelera, DNS)." -ForegroundColor Green
     Write-Host "2) Completo: Optimización profunda (Red, Energía, Telemetría, Bloatware)." -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" -ForegroundColor Red
+    Write-Host " ADVERTENCIA: Guarde su trabajo y cierre todo." -ForegroundColor Red
+    Write-Host " El PC SE REINICIARÁ AUTOMÁTICAMENTE al terminar." -ForegroundColor Red
+    Write-Host "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" -ForegroundColor Red
     
     $choice = Read-Host "Elija el modo (1/2) o escriba 'Completo'/'Rapido'"
 
