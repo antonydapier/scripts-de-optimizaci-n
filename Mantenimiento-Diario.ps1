@@ -294,19 +294,23 @@ function Block-TelemetryHosts {
         "reports.wes.df.telemetry.microsoft.com", "df.telemetry.microsoft.com",
         "survey.watson.te"
     )
+    $newEntries = @()
     try {
         $hostsContent = Get-Content -Path $hostsPath -ErrorAction Stop
         foreach ($domain in $telemetryDomains) {
             $entry = "127.0.0.1  $domain"
             $ipv6Entry = "::1      $domain"
             if (-not ($hostsContent -match [regex]::Escape($entry)) -and -not ($hostsContent -match [regex]::Escape($ipv6Entry))) {
-                Add-Content -Path $hostsPath -Value "`r`n$entry" -ErrorAction Stop
-                Add-Content -Path $hostsPath -Value "`r`n$ipv6Entry" -ErrorAction Stop
+                $newEntries += "`r`n$entry"
+                $newEntries += "`r`n$ipv6Entry"
             }
         }
-        Write-Host "     Dominios de Telemetría bloqueados en el archivo hosts." -ForegroundColor Green
+        if ($newEntries.Count -gt 0) {
+            Add-Content -Path $hostsPath -Value $newEntries -ErrorAction Stop
+        }
+        Write-Host "     Archivo hosts verificado/actualizado." -ForegroundColor Green
     } catch {
-        throw "No se pudo modificar el archivo hosts. Error: $($_.Exception.Message)"
+        throw "El archivo hosts está bloqueado (posiblemente por el Antivirus o Windows Defender)."
     }
 }
 
@@ -319,27 +323,25 @@ Confirm-IsAdmin
 # --- LÓGICA DE MENÚ Y SELECCIÓN DE MODO ---
 if (-not $Modo) {
     Write-Host "`n=================================================" -ForegroundColor Yellow
-    Write-Host "     SELECCIÓN DE MODO DE EJECUCIÓN" -ForegroundColor Yellow
+    Write-Host "     MENÚ DE MANTENIMIENTO Y OPTIMIZACIÓN" -ForegroundColor Yellow
     Write-Host "=================================================" -ForegroundColor Yellow
-    Write-Host "1) Rapido: Mantenimiento periódico (limpieza, DNS, procesos ligeros)." -ForegroundColor Green
-    Write-Host "2) Completo: Optimización profunda (Rapido + Bloatware + Inicio)." -ForegroundColor Cyan
+    Write-Host "1) Rapido: Mantenimiento (temporales, papelera, DNS)." -ForegroundColor Green
+    Write-Host "2) Completo: Optimización profunda (Red, Energía, Telemetría, Bloatware)." -ForegroundColor Cyan
     
     $choice = Read-Host "Elija el modo (1/2) o escriba 'Completo'/'Rapido'"
 
-    switch ($choice) {
+    switch -Wildcard ($choice) {
         "1" {$Modo = "Rapido"}
+        "*Rapido*" {$Modo = "Rapido"}
         "2" {$Modo = "Completo"}
-        "Rapido" {$Modo = "Rapido"}
-        "Completo" {$Modo = "Completo"}
+        "*Completo*" {$Modo = "Completo"}
         default {
             Write-Host "Opción no válida. Se ejecutará el modo 'Rapido' por defecto." -ForegroundColor Red
             $Modo = "Rapido"
         }
     }
 } else {
-    $Modo = $Modo.Trim()
-    if ($Modo -notmatch 'Completo|Rapido' -inotmatch 'Completo|Rapido') {
-        Write-Host "El modo '$Modo' no es válido. Se ejecutará el modo 'Rapido' por defecto." -ForegroundColor Red
+    if ($Modo -notmatch 'Completo|Rapido') {
         $Modo = "Rapido"
     }
 }
@@ -347,28 +349,33 @@ Write-Host "`nModo de ejecución seleccionado: $($Modo.ToUpper())" -ForegroundCo
 Write-Host "-------------------------------------------------" -ForegroundColor Yellow
 # -----------------------------------------------------------------
 
-$tasks = @(
+# Tareas básicas de mantenimiento (Se ejecutan en ambos modos)
+$maintenanceTasks = @(
     @{ Name = "Limpieza de Archivos Temporales y Caché"; Action = { Clear-TemporaryFiles } },
     @{ Name = "Limpieza de Papelera de Reciclaje"; Action = { Clear-RecycleBinAllDrives } },
+    @{ Name = "Liberación de Caché DNS"; Action = { Flush-DnsCache } }
+)
+
+# Tareas de optimización profunda (SOLO para el modo Completo)
+$optimizationTasks = @(
     @{ Name = "Limpieza de Caché de Windows Update"; Action = { Clear-SoftwareDistribution } },
     @{ Name = "Limpieza de Registros de Eventos"; Action = { Clear-EventLogs } },
-    @{ Name = "Liberación de Caché DNS"; Action = { Flush-DnsCache } },
     @{ Name = "Configuración DNS de Google (Opcional)"; Action = { Set-GoogleDns } },
     @{ Name = "Optimización de Conexiones de Red"; Action = { Set-NetworkOptimization } },
     @{ Name = "Ajuste de Plan de Energía a Equilibrado/Rendimiento"; Action = { Optimize-PowerPlan } },
-    @{ Name = "Optimización de Procesos en Segundo Plano (Segura)"; Action = { Optimize-BackgroundProcesses } },
     @{ Name = "Desactivación de Hibernación/Inicio Rápido"; Action = { Disable-Hibernation } },
     @{ Name = "Priorización de Aplicaciones en Primer Plano"; Action = { Prioritize-ForegroundApps } },
-    @{ Name = "Desactivación de Nombres 8.3"; Action = { Disable-8dot3Names } },
     @{ Name = "Desactivación de Características de Gaming (Game Bar)"; Action = { Disable-GamingFeatures } },
     @{ Name = "Desactivación de OneDrive en el Explorador"; Action = { Disable-OneDriveIntegration } },
     @{ Name = "Desactivación de Optimización de Entrega y Store Updates"; Action = { Disable-DeliveryOptimization } },
     @{ Name = "Desactivación de Sugerencias y Anuncios (WebSearch)"; Action = { Disable-WebSearch } },
+    @{ Name = "Desactivación de Nombres 8.3"; Action = { Disable-8dot3Names } },
+    @{ Name = "Optimización de Procesos en Segundo Plano (Segura)"; Action = { Optimize-BackgroundProcesses } },
     @{ Name = "Bloqueo de Dominios de Telemetría (Hosts)"; Action = { Block-TelemetryHosts } }
 )
 
-# Ejecutar tareas (Estas son las tareas del Modo Rápido)
-foreach ($task in $tasks) {
+# Ejecutar mantenimiento base
+foreach ($task in $maintenanceTasks) {
     Write-TaskStatus -TaskName $task.Name -Action $task.Action
 }
 
@@ -376,6 +383,9 @@ foreach ($task in $tasks) {
 
 if ($Modo -ieq "Completo") {
     Write-Host "`n*** Ejecutando tareas adicionales de modo COMPLETO ***" -ForegroundColor Yellow
+    foreach ($task in $optimizationTasks) {
+        Write-TaskStatus -TaskName $task.Name -Action $task.Action
+    }
     Write-TaskStatus -TaskName "Eliminación de Bloatware (con Punto de Restauración)" -Action { Remove-Bloatware }
     Write-TaskStatus -TaskName "Desactivación de Aplicaciones de Inicio (Run Keys)" -Action { Disable-StartupApps }
 }
