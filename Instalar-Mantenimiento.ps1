@@ -10,24 +10,14 @@ $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
 # Este es el comando que se ejecutará al dar doble clic
 # -WindowStyle Hidden hace que la consola no sea visible
 $Command = "iex (irm https://bit.ly/mandia-windows)" # Tu nuevo enlace Bitly
-$Shortcut.TargetPath = "$PSHOME\powershell.exe"
-
-# Codificamos el comando en Base64 para que Windows no lo bloquee por seguridad
-$CommandBytes = [System.Text.Encoding]::Unicode.GetBytes($Command)
-$EncodedCommand = [Convert]::ToBase64String($CommandBytes)
-
-$Shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -EncodedCommand $EncodedCommand"
+$Shortcut.TargetPath = "powershell.exe"
+$Shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command ""$Command"""
 $Shortcut.IconLocation = "imageres.dll,109" # Icono de mantenimiento más moderno (puedes cambiarlo)
 $Shortcut.Description = "Mantenimiento y Optimización Antony Dapier"
 $Shortcut.Save()
 
 # Esperar un instante a que el archivo se libere
 Start-Sleep -Milliseconds 500
-Unblock-File -Path $ShortcutPath -ErrorAction SilentlyContinue
-
-# Forzar que el acceso directo pida privilegios de administrador
-$bytes = [System.IO.File]::ReadAllBytes($ShortcutPath)
-$bytes[0x15] = $bytes[0x15] -bor 0x20 # Activa el bit 0x2000 (RunAsUser)
-[System.IO.File]::WriteAllBytes($ShortcutPath, $bytes)
+Unblock-File -Path $ShortcutPath
 
 [System.Windows.MessageBox]::Show("¡Instalación completada!`n`nSe ha creado el acceso directo 'Optimizar PC - Antony Dapier' en tu escritorio. Ya puedes cerrar esta ventana y usar la herramienta.", "Antony Dapier - Mantenimiento", "OK", "Information")
