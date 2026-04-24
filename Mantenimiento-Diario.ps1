@@ -339,7 +339,7 @@ if (-not $Modo) {
     Write-Host " El PC SE REINICIARÁ AUTOMÁTICAMENTE al terminar." -ForegroundColor Red
     Write-Host "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" -ForegroundColor Red
     
-    $choice = Read-Host "Elija el modo (1/2) o escriba 'Completo'/'Rapido'"
+    $choice = Read-Host "Elija el modo (1/2) o escriba 'Rapido'/'Completo'"
 
     switch -Wildcard ($choice) {
         "1" {$Modo = "Rapido"}
