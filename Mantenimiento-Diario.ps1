@@ -88,8 +88,7 @@ $xaml = @"
 "@
 
 try {
-    $reader = [System.Xml.XmlReader]::Create([System.IO.StringReader]($xaml.Trim()))
-    $Window = [Windows.Markup.XamlReader]::Load($reader)
+    $Window = [Windows.Markup.XamlReader]::Parse($xaml.Trim())
     $BtnRapido = $Window.FindName("BtnRapido")
     $BtnCompleto = $Window.FindName("BtnCompleto")
     $BtnShortcut = $Window.FindName("BtnShortcut")
@@ -147,18 +146,20 @@ function Write-TaskStatus {
 # ==============================
 
 function Ensure-LatestPowerShell {
-    Write-Host "  -> Verificando entorno de PowerShell..." -ForegroundColor Gray
-    if (Get-Command winget -ErrorAction SilentlyContinue) {
-        $isInstalled = Get-Command pwsh -ErrorAction SilentlyContinue
-        if (-not $isInstalled) {
-            Write-Host "     PowerShell 7 no detectado. Instalando versión más reciente para mejor rendimiento..." -ForegroundColor Yellow
+    Write-Host "  -> Verificando versión de PowerShell..." -ForegroundColor Gray
+    $isInstalled = Get-Command pwsh -ErrorAction SilentlyContinue
+    if (-not $isInstalled) {
+        Write-Host "     PowerShell 7 no detectado. Intentando instalar la última versión..." -ForegroundColor Yellow
+        if (Get-Command winget -ErrorAction SilentlyContinue) {
             try {
-                # Instalación silenciosa de la última versión vía winget
                 Start-Process winget -ArgumentList "install --id Microsoft.PowerShell --source winget --silent --accept-source-agreements --accept-package-agreements" -Wait
+                Write-Host "     Instalación de PowerShell 7 finalizada. Continuando ejecución..." -ForegroundColor Green
             } catch {
-                Write-Warning "No se pudo instalar automáticamente. El script continuará con la versión actual."
+                Write-Warning "No se pudo instalar automáticamente mediante winget. Se usará la versión actual."
             }
-        }
+        } else { Write-Warning "Winget no disponible para actualización automática." }
+    } else {
+        Write-Host "     PowerShell 7 ya está instalado en el sistema." -ForegroundColor Green
     }
 }
 
