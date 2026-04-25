@@ -88,7 +88,7 @@ $xaml = @"
 "@
 
 try {
-    $reader = [System.Xml.XmlReader]::Create([System.IO.StringReader]$xaml)
+    $reader = [System.Xml.XmlReader]::Create([System.IO.StringReader]($xaml.Trim()))
     $Window = [Windows.Markup.XamlReader]::Load($reader)
     $BtnRapido = $Window.FindName("BtnRapido")
     $BtnCompleto = $Window.FindName("BtnCompleto")
@@ -145,6 +145,22 @@ function Write-TaskStatus {
 # ==============================
 # FUNCIONES DE TAREA
 # ==============================
+
+function Ensure-LatestPowerShell {
+    Write-Host "  -> Verificando entorno de PowerShell..." -ForegroundColor Gray
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        $isInstalled = Get-Command pwsh -ErrorAction SilentlyContinue
+        if (-not $isInstalled) {
+            Write-Host "     PowerShell 7 no detectado. Instalando versión más reciente para mejor rendimiento..." -ForegroundColor Yellow
+            try {
+                # Instalación silenciosa de la última versión vía winget
+                Start-Process winget -ArgumentList "install --id Microsoft.PowerShell --source winget --silent --accept-source-agreements --accept-package-agreements" -Wait
+            } catch {
+                Write-Warning "No se pudo instalar automáticamente. El script continuará con la versión actual."
+            }
+        }
+    }
+}
 
 function Confirm-IsAdmin {
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
@@ -441,6 +457,7 @@ function Block-TelemetryHosts {
 # ==============================
 
 Confirm-IsAdmin
+Ensure-LatestPowerShell
 
 # --- LÓGICA DE CREACIÓN DE ACCESO DIRECTO (OPCIONAL) ---
 $shortcutName = "Mantenimiento Antony Dapier"
