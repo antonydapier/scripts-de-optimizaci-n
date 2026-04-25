@@ -9,6 +9,12 @@
 #requires -Version 5.1
 
 [CmdletBinding(SupportsShouldProcess=$true)]
+
+# Cargar librerías de interfaz gráfica
+Add-Type -AssemblyName PresentationFramework
+Add-Type -AssemblyName PresentationCore
+Add-Type -AssemblyName System.Windows.Forms
+
 param (
     # Evita el reinicio automático al finalizar el script.
     [switch]$NoReiniciar,
@@ -21,6 +27,7 @@ param (
 # --- INICIO DE LA CONFIGURACIÓN DEL INFORME ---
 $desktopPath = [System.Environment]::GetFolderPath('Desktop')
 $informePath = Join-Path -Path $desktopPath -ChildPath "Informe de Optimizacion_v10.2_($(Get-Date -Format 'yyyy-MM-dd_HH-mm-ss')).txt"
+
 $customHeader = "Gracias por usar mi Script Enfocado a Optimizar Windows 10 y Windows 11. Antony Dapier (Versión 10.2 Segura con Menú)`n"
 
 try {
@@ -29,6 +36,62 @@ try {
 } catch {
     Write-Host "No se pudo crear el archivo de informe en '$($informePath)'. Verifique los permisos." -ForegroundColor Red
     exit
+}
+
+# ==============================
+# INTERFAZ MODERNA (WPF XAML)
+# ==============================
+$xaml = @"
+<Window xmlns="http://schemas.microsoft.com/winfx/2000/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2000/xaml"
+        Title="Antony Dapier - Optimización Pro" Height="450" Width="400" 
+        WindowStartupLocation="CenterScreen" Background="#FFFFFF" ResizeMode="NoResize" FontFamily="Segoe UI">
+    <Grid>
+        <StackPanel Margin="25">
+            <TextBlock Text="PC MANTENIMIENTO" FontSize="24" FontWeight="Light" Foreground="#2C3E50" HorizontalAlignment="Center" Margin="0,0,0,5"/>
+            <TextBlock Text="By Antony Dapier" FontSize="11" Foreground="#95A5A6" HorizontalAlignment="Center" Margin="0,0,0,30"/>
+            
+            <Button Name="BtnRapido" Content="MODO RÁPIDO" Height="50" Background="#2ECC71" Foreground="White" BorderThickness="0" Cursor="Hand" Margin="0,5,0,5">
+                <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="5"/></Style></Button.Resources>
+            </Button>
+            <TextBlock Text="Mantenimiento esencial y limpieza de caché." FontSize="10" Foreground="#BDC3C7" HorizontalAlignment="Center" Margin="0,0,0,15"/>
+
+            <Button Name="BtnCompleto" Content="OPTIMIZACIÓN COMPLETA" Height="50" Background="#3498DB" Foreground="White" BorderThickness="0" Cursor="Hand" Margin="0,5,0,5">
+                <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="5"/></Style></Button.Resources>
+            </Button>
+            <TextBlock Text="Rendimiento máximo, Red, Energía y Bloatware." FontSize="10" Foreground="#BDC3C7" HorizontalAlignment="Center" Margin="0,0,0,25"/>
+
+            <Border BorderBrush="#ECF0F1" BorderThickness="1" Padding="10" CornerRadius="5">
+                <StackPanel>
+                    <TextBlock Name="StatusLabel" Text="Listo para comenzar" FontSize="12" Foreground="#34495E" HorizontalAlignment="Center"/>
+                    <ProgressBar Name="ProgressBar" Height="10" Margin="0,10,0,0" IsIndeterminate="False" Foreground="#2ECC71" Background="#F0F3F4"/>
+                </StackPanel>
+            </Border>
+            
+            <TextBlock Text="El sistema se reiniciará al finalizar." FontSize="9" Foreground="#E74C3C" HorizontalAlignment="Center" Margin="0,15,0,0" FontWeight="Bold"/>
+        </StackPanel>
+    </Grid>
+</Window>
+"@
+
+$reader = [System.Xml.XmlReader]::Create([System.IO.StringReader]$xaml)
+$Window = [Windows.Markup.XamlReader]::Load($reader)
+
+$BtnRapido = $Window.FindName("BtnRapido")
+$BtnCompleto = $Window.FindName("BtnCompleto")
+$StatusLabel = $Window.FindName("StatusLabel")
+$ProgressBar = $Window.FindName("ProgressBar")
+
+function Update-UI {
+    param([string]$Message, [double]$Progress)
+    $StatusLabel.Text = $Message
+    if ($Progress -ge 0) {
+        $ProgressBar.IsIndeterminate = $false
+        $ProgressBar.Value = $Progress
+    } else {
+        $ProgressBar.IsIndeterminate = $true
+    }
+    [System.Windows.Forms.Application]::DoEvents()
 }
 
 # ==============================
@@ -50,6 +113,7 @@ function Write-TaskStatus {
     )
     Write-Host -NoNewline "  -> $TaskName..."
     try {
+        Update-UI -Message "Ejecutando: $TaskName" -Progress -1
         & $Action
         Write-Host " [OK]" -ForegroundColor Green
     } catch {
@@ -65,8 +129,10 @@ function Write-TaskStatus {
 function Confirm-IsAdmin {
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
         Write-Host "Este script necesita permisos de Administrador. Intentando elevar..." -ForegroundColor Red
-        $params = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$($MyInvocation.MyCommand.Path)`"")
-        Start-Process powershell -ArgumentList $params -Verb RunAs
+        $url = "https://bit.ly/pc-mantenimiento-diario"
+        $argList = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Normal -Command `"iex (irm $url)`""
+        
+        Start-Process powershell.exe -ArgumentList $argList -Verb RunAs
         exit
     }
 }
@@ -326,52 +392,25 @@ function Block-TelemetryHosts {
 
 Confirm-IsAdmin
 
-# --- LÓGICA DE MENÚ Y SELECCIÓN DE MODO ---
-if (-not $Modo) {
-    Write-Host "`n=================================================" -ForegroundColor Yellow
-    Write-Host "     MENÚ DE MANTENIMIENTO Y OPTIMIZACIÓN" -ForegroundColor Yellow
-    Write-Host "=================================================" -ForegroundColor Yellow
-    Write-Host "1) Rapido: Mantenimiento (temporales, papelera, DNS)." -ForegroundColor Green
-    Write-Host "2) Completo: Optimización profunda (Red, Energía, Telemetría, Bloatware)." -ForegroundColor Cyan
-    Write-Host ""
-    Write-Host "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" -ForegroundColor Red
-    Write-Host " ADVERTENCIA: Guarde su trabajo y cierre todo." -ForegroundColor Red
-    Write-Host " El PC SE REINICIARÁ AUTOMÁTICAMENTE al terminar." -ForegroundColor Red
-    Write-Host "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" -ForegroundColor Red
+# --- LÓGICA DE EJECUCIÓN ---
+$RunProcess = {
+    param($Seleccion)
+    $BtnRapido.IsEnabled = $false
+    $BtnCompleto.IsEnabled = $false
     
-    $choice = Read-Host "Elija el modo (1/2) o escriba 'Rapido'/'Completo'"
+    # Tareas básicas
+    $maintenanceTasks = @(
+        @{ Name = "Limpieza Temporales"; Action = { Clear-TemporaryFiles } },
+        @{ Name = "Vaciado de Papelera"; Action = { Clear-RecycleBinAllDrives } },
+        @{ Name = "Flush DNS"; Action = { Flush-DnsCache } }
+    )
+    foreach ($task in $maintenanceTasks) { Write-TaskStatus -TaskName $task.Name -Action $task.Action }
 
-    switch -Wildcard ($choice) {
-        "1" {$Modo = "Rapido"}
-        "*Rapido*" {$Modo = "Rapido"}
-        "2" {$Modo = "Completo"}
-        "*Completo*" {$Modo = "Completo"}
-        default {
-            Write-Host "Opción no válida. Se ejecutará el modo 'Rapido' por defecto." -ForegroundColor Red
-            $Modo = "Rapido"
-        }
-    }
-} else {
-    if ($Modo -notmatch 'Completo|Rapido') {
-        $Modo = "Rapido"
-    }
-}
-Write-Host "`nModo de ejecución seleccionado: $($Modo.ToUpper())" -ForegroundColor Yellow
-Write-Host "-------------------------------------------------" -ForegroundColor Yellow
-# -----------------------------------------------------------------
-
-# Tareas básicas de mantenimiento (Se ejecutan en ambos modos)
-$maintenanceTasks = @(
-    @{ Name = "Limpieza de Archivos Temporales y Caché"; Action = { Clear-TemporaryFiles } },
-    @{ Name = "Limpieza de Papelera de Reciclaje"; Action = { Clear-RecycleBinAllDrives } },
-    @{ Name = "Liberación de Caché DNS"; Action = { Flush-DnsCache } }
-)
-
-# Tareas de optimización profunda (SOLO para el modo Completo)
-$optimizationTasks = @(
+    if ($Seleccion -eq "Completo") {
+        $optimizationTasks = @(
     @{ Name = "Limpieza de Caché de Windows Update"; Action = { Clear-SoftwareDistribution } },
     @{ Name = "Limpieza de Registros de Eventos"; Action = { Clear-EventLogs } },
-    @{ Name = "Configuración DNS de Google (Opcional)"; Action = { Set-GoogleDns } },
+    @{ Name = "Configuración DNS de Google"; Action = { Set-GoogleDns } },
     @{ Name = "Optimización de Conexiones de Red"; Action = { Set-NetworkOptimization } },
     @{ Name = "Ajuste de Plan de Energía a Equilibrado/Rendimiento"; Action = { Optimize-PowerPlan } },
     @{ Name = "Desactivación de Hibernación/Inicio Rápido"; Action = { Disable-Hibernation } },
@@ -383,36 +422,22 @@ $optimizationTasks = @(
     @{ Name = "Desactivación de Nombres 8.3"; Action = { Disable-8dot3Names } },
     @{ Name = "Optimización de Procesos en Segundo Plano (Segura)"; Action = { Optimize-BackgroundProcesses } },
     @{ Name = "Bloqueo de Dominios de Telemetría (Hosts)"; Action = { Block-TelemetryHosts } }
-)
-
-# Ejecutar mantenimiento base
-foreach ($task in $maintenanceTasks) {
-    Write-TaskStatus -TaskName $task.Name -Action $task.Action
-}
-
-# --- LÓGICA DE MODO COMPLETO ---
-
-if ($Modo -ieq "Completo") {
-    Write-Host "`n*** Ejecutando tareas adicionales de modo COMPLETO ***" -ForegroundColor Yellow
-    foreach ($task in $optimizationTasks) {
-        Write-TaskStatus -TaskName $task.Name -Action $task.Action
+        )
+        foreach ($task in $optimizationTasks) { Write-TaskStatus -TaskName $task.Name -Action $task.Action }
+        Write-TaskStatus -TaskName "Eliminación de Bloatware" -Action { Remove-Bloatware }
+        Write-TaskStatus -TaskName "Apps de Inicio" -Action { Disable-StartupApps }
     }
-    Write-TaskStatus -TaskName "Eliminación de Bloatware (con Punto de Restauración)" -Action { Remove-Bloatware }
-    Write-TaskStatus -TaskName "Desactivación de Aplicaciones de Inicio (Run Keys)" -Action { Disable-StartupApps }
+
+    Update-UI -Message "¡PROCESO FINALIZADO!" -Progress 100
+    Stop-Transcript
+    
+    [System.Windows.MessageBox]::Show("Optimización completada con éxito. El equipo se reiniciará ahora.", "Finalizado", "OK", "Information")
+    if (-not $NoReiniciar) { Restart-Computer -Force }
 }
 
-# --- FIN DEL SCRIPT ---
+# Eventos de botones
+$BtnRapido.Add_Click({ & $RunProcess -Seleccion "Rapido" })
+$BtnCompleto.Add_Click({ & $RunProcess -Seleccion "Completo" })
 
-Stop-Transcript
-Write-Host "`n=================================================" -ForegroundColor Cyan
-Write-Host "         OPTIMIZACIÓN COMPLETADA" -ForegroundColor Cyan
-Write-Host "=================================================" -ForegroundColor Cyan
-Write-Host "El informe detallado se ha guardado en el Escritorio." -ForegroundColor Cyan
-
-if (-not $NoReiniciar) {
-    Write-Host "`nEl script finalizará en 10 segundos e intentará reiniciar el PC para aplicar los cambios." -ForegroundColor Red
-    Start-Sleep -Seconds 10
-    Restart-Computer -Force
-} else {
-    Write-Host "`nEl reinicio automático ha sido omitido. Por favor, reinicie manualmente." -ForegroundColor Green
-}
+# Mostrar ventana
+$Window.ShowDialog() | Out-Null
