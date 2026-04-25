@@ -110,18 +110,32 @@ function Create-DesktopShortcut {
         [string]$IconLocation = "imageres.dll,109", # Icono de herramientas de Windows
         [string]$Description = "Mantenimiento y Optimización Antony Dapier"
     )
+    
     $desktopPath = [System.Environment]::GetFolderPath('Desktop')
+    $vbsFileName = "$ShortcutName.vbs"
+    $vbsPath = Join-Path $desktopPath $vbsFileName
     $shortcutPath = Join-Path $desktopPath "$ShortcutName.lnk"
 
     try {
+        # 1. Crear el script VBScript auxiliar que lanzará PowerShell con permisos de administrador.
+        #    Esto asegura que el UAC se muestre y PowerShell se inicie elevado.
+        $psCommand = "-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Normal -Command `"$TargetCommand`""
+        $vbsContent = @"
+Set objShell = CreateObject("Shell.Application")
+objShell.ShellExecute "powershell.exe", "$psCommand", "", "runas", 1
+"@
+        # Guardar el VBScript en el escritorio
+        $vbsContent | Out-File -FilePath $vbsPath -Encoding ASCII -Force
+
+        # 2. Crear el acceso directo (.lnk) que apunta al VBScript
         $WshShell = New-Object -ComObject WScript.Shell
         $Shortcut = $WshShell.CreateShortcut($shortcutPath)
-        $Shortcut.TargetPath = "powershell.exe"
-        $Shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -Command `"$TargetCommand`""
+        $Shortcut.TargetPath = $vbsPath # El acceso directo apunta al VBScript
         $Shortcut.IconLocation = $IconLocation
         $Shortcut.Description = $Description
         $Shortcut.Save()
-        [System.Windows.Forms.MessageBox]::Show("¡Acceso directo creado en el escritorio!`nAhora puedes usarlo para iniciar la herramienta.", "Acceso Directo Creado - Antony Dapier", "OK", "Information")
+
+        [System.Windows.Forms.MessageBox]::Show("¡Acceso directo creado en el escritorio!`nAhora puedes usarlo para iniciar la herramienta. Se solicitarán permisos de administrador al ejecutarlo.", "Acceso Directo Creado - Antony Dapier", "OK", "Information")
     } catch {
         [System.Windows.Forms.MessageBox]::Show("Error al crear el acceso directo: $($_.Exception.Message)", "Error - Antony Dapier", "OK", "Error")
     }
