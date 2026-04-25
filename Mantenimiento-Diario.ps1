@@ -18,9 +18,18 @@ param (
     [string]$Modo
 )
 
+# --- FORZAR MODO STA (REQUERIDO PARA WPF) ---
+if ([System.Threading.Thread]::CurrentThread.GetApartmentState() -ne 'STA') {
+    Write-Host "Reiniciando en modo STA para soportar la interfaz gráfica..." -ForegroundColor Yellow
+    $url = "https://bit.ly/pc-mantenimiento-diario"
+    Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -STA -Command `"iex (irm $url)`""
+    exit
+}
+
 # --- CARGA DE LIBRERÍAS Y GUI (DEBE IR DESPUÉS DE PARAM) ---
 try {
-    Add-Type -AssemblyName PresentationFramework, PresentationCore, System.Windows.Forms -ErrorAction Stop
+    # WindowsBase es fundamental para que el esquema XAML sea reconocido
+    Add-Type -AssemblyName WindowsBase, PresentationFramework, PresentationCore, System.Windows.Forms -ErrorAction Stop
 } catch { Write-Host "Error cargando librerías GUI."; exit }
 
 # --- INICIO DE LA CONFIGURACIÓN DEL INFORME ---
@@ -88,7 +97,11 @@ $xaml = @"
 "@
 
 try {
-    $Window = [Windows.Markup.XamlReader]::Parse($xaml.Trim())
+    # Limpieza profunda del string para evitar errores de "tipo desconocido" en la posición 2
+    $cleanXaml = $xaml.Trim()
+    if ($cleanXaml.StartsWith("?")) { $cleanXaml = $cleanXaml.Substring(1) }
+    
+    $Window = [Windows.Markup.XamlReader]::Parse($cleanXaml)
     $BtnRapido = $Window.FindName("BtnRapido")
     $BtnCompleto = $Window.FindName("BtnCompleto")
     $BtnShortcut = $Window.FindName("BtnShortcut")
@@ -167,7 +180,7 @@ function Confirm-IsAdmin {
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
         Write-Host "Este script necesita permisos de Administrador. Intentando elevar..." -ForegroundColor Red
         $url = "https://bit.ly/pc-mantenimiento-diario"
-        $argList = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Normal -Command `"iex (irm $url)`"" # URL del script
+        $argList = "-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Normal -Command `"iex (irm $url)`"" # Agregado -STA
         
         try {
             Start-Process powershell.exe -ArgumentList $argList -Verb RunAs -ErrorAction Stop
@@ -194,7 +207,7 @@ function Create-DesktopShortcut {
         $WshShell = New-Object -ComObject WScript.Shell
         $Shortcut = $WshShell.CreateShortcut($shortcutPath)
         $Shortcut.TargetPath = "powershell.exe"
-        $Shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command `"$TargetCommand`""
+        $Shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -Command `"$TargetCommand`""
         $Shortcut.IconLocation = $IconLocation
         $Shortcut.Description = $Description
         $Shortcut.Save()
