@@ -9,12 +9,6 @@
 #requires -Version 5.1
 
 [CmdletBinding(SupportsShouldProcess=$true)]
-
-# Cargar librerías de interfaz gráfica
-Add-Type -AssemblyName PresentationFramework
-Add-Type -AssemblyName PresentationCore
-Add-Type -AssemblyName System.Windows.Forms
-
 param (
     # Evita el reinicio automático al finalizar el script.
     [switch]$NoReiniciar,
@@ -23,6 +17,11 @@ param (
     [Parameter(Mandatory=$false, HelpMessage="Elige 'Completo' para una optimización profunda inicial, o 'Rapido' para un mantenimiento periódico.")]
     [string]$Modo
 )
+
+# Cargar librerías de interfaz gráfica
+Add-Type -AssemblyName PresentationFramework
+Add-Type -AssemblyName PresentationCore
+Add-Type -AssemblyName System.Windows.Forms
 
 # --- INICIO DE LA CONFIGURACIÓN DEL INFORME ---
 $desktopPath = [System.Environment]::GetFolderPath('Desktop')
