@@ -28,9 +28,10 @@ if ([System.Threading.Thread]::CurrentThread.GetApartmentState() -ne 'STA') {
 
 # --- CARGA DE LIBRERÍAS Y GUI (DEBE IR DESPUÉS DE PARAM) ---
 try {
-    # WindowsBase es fundamental para que el esquema XAML sea reconocido
-    Add-Type -AssemblyName WindowsBase, PresentationFramework, PresentationCore, System.Windows.Forms -ErrorAction Stop
-} catch { Write-Host "Error cargando librerías GUI."; exit }
+    # Cargamos el conjunto completo de librerías para máxima compatibilidad
+    $assemblies = @("WindowsBase", "PresentationCore", "PresentationFramework", "System.Xaml", "System.Xml", "System.Windows.Forms")
+    foreach ($as in $assemblies) { [void][System.Reflection.Assembly]::LoadWithPartialName($as) }
+} catch { Write-Host "Error cargando ensamblados de sistema."; exit }
 
 # --- INICIO DE LA CONFIGURACIÓN DEL INFORME ---
 $desktopPath = [System.Environment]::GetFolderPath('Desktop')
@@ -97,11 +98,17 @@ $xaml = @"
 "@
 
 try {
-    # Limpieza profunda del string para evitar errores de "tipo desconocido" en la posición 2
-    $cleanXaml = $xaml.Trim()
-    if ($cleanXaml.StartsWith("?")) { $cleanXaml = $cleanXaml.Substring(1) }
+    # Eliminación agresiva de caracteres invisibles o BOM al inicio del XAML
+    $cleanXaml = $xaml -replace '^[^<]+', ''
     
-    $Window = [Windows.Markup.XamlReader]::Parse($cleanXaml)
+    # Uso de XmlReader con configuraciones de compatibilidad
+    $sReader = New-Object System.IO.StringReader($cleanXaml)
+    $xSettings = New-Object System.Xml.XmlReaderSettings
+    $xReader = [System.Xml.XmlReader]::Create($sReader, $xSettings)
+    
+    # Carga del objeto Window
+    $Window = [Windows.Markup.XamlReader]::Load($xReader)
+
     $BtnRapido = $Window.FindName("BtnRapido")
     $BtnCompleto = $Window.FindName("BtnCompleto")
     $BtnShortcut = $Window.FindName("BtnShortcut")
@@ -159,20 +166,10 @@ function Write-TaskStatus {
 # ==============================
 
 function Ensure-LatestPowerShell {
-    Write-Host "  -> Verificando versión de PowerShell..." -ForegroundColor Gray
-    $isInstalled = Get-Command pwsh -ErrorAction SilentlyContinue
-    if (-not $isInstalled) {
-        Write-Host "     PowerShell 7 no detectado. Intentando instalar la última versión..." -ForegroundColor Yellow
-        if (Get-Command winget -ErrorAction SilentlyContinue) {
-            try {
-                Start-Process winget -ArgumentList "install --id Microsoft.PowerShell --source winget --silent --accept-source-agreements --accept-package-agreements" -Wait
-                Write-Host "     Instalación de PowerShell 7 finalizada. Continuando ejecución..." -ForegroundColor Green
-            } catch {
-                Write-Warning "No se pudo instalar automáticamente mediante winget. Se usará la versión actual."
-            }
-        } else { Write-Warning "Winget no disponible para actualización automática." }
+    if ($PSVersionTable.PSVersion.Major -lt 5) {
+        Write-Warning "Versión de PowerShell muy antigua ($($PSVersionTable.PSVersion.Major)). Se recomienda actualizar para estabilidad."
     } else {
-        Write-Host "     PowerShell 7 ya está instalado en el sistema." -ForegroundColor Green
+        Write-Host "  -> Entorno PowerShell $($PSVersionTable.PSVersion.Major).$($PSVersionTable.PSVersion.Minor) compatible." -ForegroundColor Gray
     }
 }
 
