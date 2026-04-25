@@ -18,21 +18,10 @@ param (
     [string]$Modo
 )
 
-# --- FORZAR MODO STA (REQUERIDO PARA WPF) ---
-if ([System.Threading.Thread]::CurrentThread.GetApartmentState() -ne 'STA') {
-    Write-Host "Reiniciando en modo STA para soportar la interfaz gráfica..." -ForegroundColor Yellow
-    $url = "https://bit.ly/pc-mantenimiento-diario"
-    Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -STA -Command `"iex (irm $url)`""
-    exit
-}
-
 # --- CARGA DE LIBRERÍAS Y GUI (DEBE IR DESPUÉS DE PARAM) ---
 try {
-    # Add-Type es el método más seguro para registrar tipos en el motor de XAML de PowerShell 5.1
-    Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase, System.Xaml, System.Xml, System.Windows.Forms -ErrorAction Stop
-    # Forzamos una referencia al tipo Window para asegurar que el motor de XAML lo reconozca
-    [void][System.Windows.Window]
-} catch { Write-Host "Error cargando ensamblados de sistema."; exit }
+    Add-Type -AssemblyName System.Windows.Forms
+} catch { Write-Host "Error cargando librerías básicas."; exit }
 
 # --- INICIO DE LA CONFIGURACIÓN DEL INFORME ---
 $desktopPath = [System.Environment]::GetFolderPath('Desktop')
@@ -48,83 +37,13 @@ try {
     exit
 }
 
-# ==============================
-# INTERFAZ MODERNA (WPF XAML)
-# ==============================
-$xaml = @"
-<Window xmlns="http://schemas.microsoft.com/winfx/2000/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2000/xaml" 
-        Title="Antony Dapier - Mantenimiento Pro" Height="520" Width="400" 
-        WindowStartupLocation="CenterScreen" Background="#F0F3F7" ResizeMode="NoResize" FontFamily="Segoe UI">
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="90"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
-
-        <Border Grid.Row="0" Background="#2C3E50" Padding="15">
-            <StackPanel VerticalAlignment="Center">
-                <TextBlock Text="MANTENIMIENTO DE SISTEMA" HorizontalAlignment="Center" Foreground="White" FontSize="18" FontWeight="Light"/>
-                <TextBlock Text="By Antony Dapier - Versión 10.2" HorizontalAlignment="Center" Foreground="#BDC3C7" FontSize="11"/>
-            </StackPanel>
-        </Border>
-
-        <StackPanel Grid.Row="1" Margin="30,25">
-            <Button Name="BtnRapido" Content="MANTENIMIENTO RÁPIDO" Height="50" Background="#3498DB" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand">
-                <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="5"/></Style></Button.Resources>
-            </Button>
-            <TextBlock Text="Temporales, DNS y papelera." HorizontalAlignment="Center" Margin="0,5,0,15" Foreground="#7F8C8D" FontSize="10"/>
-
-            <Button Name="BtnCompleto" Content="OPTIMIZACIÓN COMPLETA" Height="50" Background="#2ECC71" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand">
-                <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="5"/></Style></Button.Resources>
-            </Button>
-            <TextBlock Text="Rendimiento, Red y Bloatware." HorizontalAlignment="Center" Margin="0,5,0,15" Foreground="#7F8C8D" FontSize="10"/>
-
-            <Button Name="BtnShortcut" Content="INSTALAR ACCESO DIRECTO" Height="40" Background="#95A5A6" Foreground="White" FontWeight="SemiBold" BorderThickness="0" Cursor="Hand">
-                <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="5"/></Style></Button.Resources>
-            </Button>
-            <TextBlock Text="Crear acceso en el escritorio." HorizontalAlignment="Center" Margin="0,5,0,20" Foreground="#7F8C8D" FontSize="9"/>
-
-            <Border Background="White" BorderBrush="#DCDDE1" BorderThickness="1" Padding="10" CornerRadius="8">
-                <StackPanel>
-                    <TextBlock Name="StatusLabel" Text="Estado: Esperando acción..." Foreground="#34495E" FontSize="11" HorizontalAlignment="Center"/>
-                    <ProgressBar Name="ProgressBar" Height="6" Margin="0,8,0,0" Foreground="#3498DB" Background="#ECF0F1" BorderThickness="0"/>
-                </StackPanel>
-            </Border>
-            
-            <TextBlock Text="AVISO: El equipo se reiniciará al finalizar." HorizontalAlignment="Center" Margin="0,15,0,0" Foreground="#E74C3C" FontSize="10" FontWeight="Bold"/>
-        </StackPanel>
-    </Grid>
-</Window>
-"@
-
-try {
-    # Limpieza total para asegurar que el string comience exactamente en <Window
-    $cleanXaml = $xaml -replace '^[^<]+', ''
-    $Window = [Windows.Markup.XamlReader]::Parse($cleanXaml)
-
-    $BtnRapido = $Window.FindName("BtnRapido")
-    $BtnCompleto = $Window.FindName("BtnCompleto")
-    $BtnShortcut = $Window.FindName("BtnShortcut")
-    $StatusLabel = $Window.FindName("StatusLabel")
-    $ProgressBar = $Window.FindName("ProgressBar")
-} catch {
-    [System.Windows.Forms.MessageBox]::Show("Error crítico al cargar la interfaz gráfica: $($_.Exception.Message)`n`nAsegúrate de que tu sistema Windows esté actualizado y que PowerShell 5.1 o superior esté instalado.", "Error de Interfaz - Antony Dapier", "OK", "Error")
-    exit
-}
-
 function Update-UI {
     param([string]$Message, [double]$Progress)
-    if ($StatusLabel) { $StatusLabel.Text = $Message }
-    if ($ProgressBar) {
-        if ($Progress -ge 0) {
-            $ProgressBar.IsIndeterminate = $false
-            $ProgressBar.Value = $Progress
-        } else {
-            $ProgressBar.IsIndeterminate = $true
-        }
+    if ($Progress -gt 0) {
+        Write-Host "`n>>> $Message [$Progress%]" -ForegroundColor Cyan
+    } else {
+        Write-Host "`n>>> $Message" -ForegroundColor Cyan
     }
-    [System.Windows.Forms.Application]::DoEvents()
 }
 
 # ==============================
@@ -146,7 +65,7 @@ function Write-TaskStatus {
     )
     Write-Host -NoNewline "  -> $TaskName..."
     try {
-        Update-UI -Message "Ejecutando: $TaskName" -Progress -1
+        # Update-UI -Message "Ejecutando: $TaskName"
         & $Action
         Write-Host " [OK]" -ForegroundColor Green
     } catch {
@@ -462,31 +381,14 @@ function Block-TelemetryHosts {
 # ==============================
 
 Confirm-IsAdmin
-Ensure-LatestPowerShell
-
-# --- LÓGICA DE CREACIÓN DE ACCESO DIRECTO (OPCIONAL) ---
-$shortcutName = "Mantenimiento Antony Dapier"
-$desktopPath = [System.Environment]::GetFolderPath('Desktop')
-$shortcutPath = Join-Path $desktopPath "$shortcutName.lnk"
-
-if (-not (Test-Path $shortcutPath)) {
-    $dialogResult = [System.Windows.Forms.MessageBox]::Show(
-        "No se encontró el acceso directo de la herramienta en tu escritorio.`n¿Deseas crearlo ahora?",
-        "Crear Acceso Directo - Antony Dapier",
-        "YesNo",
-        "Question"
-    )
-    if ($dialogResult -eq "Yes") {
-        Create-DesktopShortcut -ShortcutName $shortcutName -TargetCommand "iex (irm https://bit.ly/pc-mantenimiento-diario)"
-    }
-}
+Clear-Host
+Write-Host "====================================================" -ForegroundColor Cyan
+Write-Host "    MANTENIMIENTO DE SISTEMA - ANTONY DAPIER" -ForegroundColor White
+Write-Host "====================================================" -ForegroundColor Cyan
 
 # --- LÓGICA DE EJECUCIÓN ---
 $RunProcess = {
     param($Seleccion)
-    $BtnRapido.IsEnabled = $false
-    $BtnCompleto.IsEnabled = $false
-    
     # Tareas básicas
     $maintenanceTasks = @(
         @{ Name = "Limpieza Temporales"; Action = { Clear-TemporaryFiles } },
@@ -524,10 +426,36 @@ $RunProcess = {
     if (-not $NoReiniciar) { Restart-Computer -Force }
 }
 
-# Eventos de botones
-$BtnRapido.Add_Click({ & $RunProcess -Seleccion "Rapido" })
-$BtnCompleto.Add_Click({ & $RunProcess -Seleccion "Completo" })
-$BtnShortcut.Add_Click({ Create-DesktopShortcut -ShortcutName "Mantenimiento Antony Dapier" -TargetCommand "iex (irm https://bit.ly/pc-mantenimiento-diario)" })
+# --- MENÚ DE CONSOLA ---
+Write-Host "1. Mantenimiento Rápido (Temporales, DNS, Papelera)"
+Write-Host "2. Optimización Completa (Red, Energía, Bloatware, Servicios)"
+Write-Host "3. Instalar Acceso Directo en el Escritorio"
+Write-Host "4. Salir"
+Write-Host ""
+$opcion = Read-Host "Seleccione una opción"
 
-# Mostrar ventana
+switch ($opcion) {
+    "1" { 
+        & $RunProcess -Seleccion "Rapido" 
+    }
+    "2" { 
+        & $RunProcess -Seleccion "Completo" 
+    }
+    "3" { 
+        Create-DesktopShortcut -ShortcutName "Mantenimiento Antony Dapier" -TargetCommand "iex (irm https://bit.ly/pc-mantenimiento-diario)" 
+        Write-Host "Presione cualquier tecla para volver al menú..."
+        $null = [Console]::ReadKey()
+        & "$PSCommandPath" # Reinicia el script para mostrar el menú
+    }
+    "4" { 
+        Write-Host "Saliendo..." -ForegroundColor Yellow
+        Stop-Transcript
+        exit 
+    }
+    Default { 
+        Write-Host "Opción no válida." -ForegroundColor Red
+        Start-Sleep -Seconds 2
+        & "$PSCommandPath"
+    }
+}
 $Window.ShowDialog() | Out-Null
