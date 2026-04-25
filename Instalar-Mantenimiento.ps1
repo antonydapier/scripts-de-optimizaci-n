@@ -1,15 +1,18 @@
 # Script para crear el acceso directo al mantenimiento remoto
-Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Windows.Forms, PresentationFramework
 
 $Desktop = [System.Environment]::GetFolderPath('Desktop')
-$ShortcutPath = Join-Path $Desktop "Optimizar PC - Antony Dapier.lnk" # Nombre del acceso directo
+$ShortcutPath = Join-Path $Desktop "Mantenimiento Antony Dapier.lnk"
+
+# Borrar si existe para evitar conflictos
+if (Test-Path $ShortcutPath) { Remove-Item $ShortcutPath -Force }
 
 $WshShell = New-Object -ComObject WScript.Shell
 $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
 
-# Comando directo y simple, como el de Chris Titus
+# TargetPath a PowerShell oficial para que el ICONO se vea bien de inmediato
 $Shortcut.TargetPath = "powershell.exe"
-$Shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -Command ""iex (irm https://bit.ly/pc-mantenimiento-diario)"""
+$Shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command ""iex (irm https://bit.ly/pc-mantenimiento-diario)"""
 
 $Shortcut.IconLocation = "imageres.dll,109" # Icono de herramientas de Windows
 $Shortcut.Description = "Mantenimiento y Optimización Antony Dapier"
