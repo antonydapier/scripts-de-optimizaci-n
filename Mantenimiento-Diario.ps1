@@ -19,9 +19,9 @@ param (
 )
 
 # --- CARGA DE LIBRERÍAS Y GUI (DEBE IR DESPUÉS DE PARAM) ---
-Add-Type -AssemblyName PresentationFramework
-Add-Type -AssemblyName PresentationCore
-Add-Type -AssemblyName System.Windows.Forms
+try {
+    Add-Type -AssemblyName PresentationFramework, PresentationCore, System.Windows.Forms -ErrorAction Stop
+} catch { Write-Host "Error cargando librerías GUI."; exit }
 
 # --- INICIO DE LA CONFIGURACIÓN DEL INFORME ---
 $desktopPath = [System.Environment]::GetFolderPath('Desktop')
@@ -42,53 +42,74 @@ try {
 # ==============================
 $xaml = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2000/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2000/xaml"
-        Title="Antony Dapier - Optimización Pro" Height="450" Width="400" 
-        WindowStartupLocation="CenterScreen" Background="#FFFFFF" ResizeMode="NoResize" FontFamily="Segoe UI">
+        xmlns:x="http://schemas.microsoft.com/winfx/2000/xaml" 
+        Title="Antony Dapier - Mantenimiento Pro" Height="520" Width="400" 
+        WindowStartupLocation="CenterScreen" Background="#F0F3F7" ResizeMode="NoResize" FontFamily="Segoe UI">
     <Grid>
-        <StackPanel Margin="25">
-            <TextBlock Text="PC MANTENIMIENTO" FontSize="24" FontWeight="Light" Foreground="#2C3E50" HorizontalAlignment="Center" Margin="0,0,0,5"/>
-            <TextBlock Text="By Antony Dapier" FontSize="11" Foreground="#95A5A6" HorizontalAlignment="Center" Margin="0,0,0,30"/>
-            
-            <Button Name="BtnRapido" Content="MODO RÁPIDO" Height="50" Background="#2ECC71" Foreground="White" BorderThickness="0" Cursor="Hand" Margin="0,5,0,5">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="90"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Background="#2C3E50" Padding="15">
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock Text="MANTENIMIENTO DE SISTEMA" HorizontalAlignment="Center" Foreground="White" FontSize="18" FontWeight="Light"/>
+                <TextBlock Text="By Antony Dapier - Versión 10.2" HorizontalAlignment="Center" Foreground="#BDC3C7" FontSize="11"/>
+            </StackPanel>
+        </Border>
+
+        <StackPanel Grid.Row="1" Margin="30,25">
+            <Button Name="BtnRapido" Content="MANTENIMIENTO RÁPIDO" Height="50" Background="#3498DB" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand">
                 <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="5"/></Style></Button.Resources>
             </Button>
-            <TextBlock Text="Mantenimiento esencial y limpieza de caché." FontSize="10" Foreground="#BDC3C7" HorizontalAlignment="Center" Margin="0,0,0,15"/>
+            <TextBlock Text="Temporales, DNS y papelera." HorizontalAlignment="Center" Margin="0,5,0,15" Foreground="#7F8C8D" FontSize="10"/>
 
-            <Button Name="BtnCompleto" Content="OPTIMIZACIÓN COMPLETA" Height="50" Background="#3498DB" Foreground="White" BorderThickness="0" Cursor="Hand" Margin="0,5,0,5">
+            <Button Name="BtnCompleto" Content="OPTIMIZACIÓN COMPLETA" Height="50" Background="#2ECC71" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand">
                 <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="5"/></Style></Button.Resources>
             </Button>
-            <TextBlock Text="Rendimiento máximo, Red, Energía y Bloatware." FontSize="10" Foreground="#BDC3C7" HorizontalAlignment="Center" Margin="0,0,0,25"/>
+            <TextBlock Text="Rendimiento, Red y Bloatware." HorizontalAlignment="Center" Margin="0,5,0,15" Foreground="#7F8C8D" FontSize="10"/>
 
-            <Border BorderBrush="#ECF0F1" BorderThickness="1" Padding="10" CornerRadius="5">
+            <Button Name="BtnShortcut" Content="INSTALAR ACCESO DIRECTO" Height="40" Background="#95A5A6" Foreground="White" FontWeight="SemiBold" BorderThickness="0" Cursor="Hand">
+                <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="5"/></Style></Button.Resources>
+            </Button>
+            <TextBlock Text="Crear acceso en el escritorio." HorizontalAlignment="Center" Margin="0,5,0,20" Foreground="#7F8C8D" FontSize="9"/>
+
+            <Border Background="White" BorderBrush="#DCDDE1" BorderThickness="1" Padding="10" CornerRadius="8">
                 <StackPanel>
-                    <TextBlock Name="StatusLabel" Text="Listo para comenzar" FontSize="12" Foreground="#34495E" HorizontalAlignment="Center"/>
-                    <ProgressBar Name="ProgressBar" Height="10" Margin="0,10,0,0" IsIndeterminate="False" Foreground="#2ECC71" Background="#F0F3F4"/>
+                    <TextBlock Name="StatusLabel" Text="Estado: Esperando acción..." Foreground="#34495E" FontSize="11" HorizontalAlignment="Center"/>
+                    <ProgressBar Name="ProgressBar" Height="6" Margin="0,8,0,0" Foreground="#3498DB" Background="#ECF0F1" BorderThickness="0"/>
                 </StackPanel>
             </Border>
             
-            <TextBlock Text="El sistema se reiniciará al finalizar." FontSize="9" Foreground="#E74C3C" HorizontalAlignment="Center" Margin="0,15,0,0" FontWeight="Bold"/>
+            <TextBlock Text="AVISO: El equipo se reiniciará al finalizar." HorizontalAlignment="Center" Margin="0,15,0,0" Foreground="#E74C3C" FontSize="10" FontWeight="Bold"/>
         </StackPanel>
     </Grid>
 </Window>
 "@
 
-$reader = [System.Xml.XmlReader]::Create([System.IO.StringReader]$xaml)
-$Window = [Windows.Markup.XamlReader]::Load($reader)
-
-$BtnRapido = $Window.FindName("BtnRapido")
-$BtnCompleto = $Window.FindName("BtnCompleto")
-$StatusLabel = $Window.FindName("StatusLabel")
-$ProgressBar = $Window.FindName("ProgressBar")
+try {
+    $reader = [System.Xml.XmlReader]::Create([System.IO.StringReader]$xaml)
+    $Window = [Windows.Markup.XamlReader]::Load($reader)
+    $BtnRapido = $Window.FindName("BtnRapido")
+    $BtnCompleto = $Window.FindName("BtnCompleto")
+    $BtnShortcut = $Window.FindName("BtnShortcut")
+    $StatusLabel = $Window.FindName("StatusLabel")
+    $ProgressBar = $Window.FindName("ProgressBar")
+} catch {
+    [System.Windows.Forms.MessageBox]::Show("Error crítico al cargar la interfaz gráfica: $($_.Exception.Message)`n`nAsegúrate de que tu sistema Windows esté actualizado y que PowerShell 5.1 o superior esté instalado.", "Error de Interfaz - Antony Dapier", "OK", "Error")
+    exit
+}
 
 function Update-UI {
     param([string]$Message, [double]$Progress)
-    $StatusLabel.Text = $Message
-    if ($Progress -ge 0) {
-        $ProgressBar.IsIndeterminate = $false
-        $ProgressBar.Value = $Progress
-    } else {
-        $ProgressBar.IsIndeterminate = $true
+    if ($StatusLabel) { $StatusLabel.Text = $Message }
+    if ($ProgressBar) {
+        if ($Progress -ge 0) {
+            $ProgressBar.IsIndeterminate = $false
+            $ProgressBar.Value = $Progress
+        } else {
+            $ProgressBar.IsIndeterminate = $true
+        }
     }
     [System.Windows.Forms.Application]::DoEvents()
 }
@@ -129,10 +150,40 @@ function Confirm-IsAdmin {
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
         Write-Host "Este script necesita permisos de Administrador. Intentando elevar..." -ForegroundColor Red
         $url = "https://bit.ly/pc-mantenimiento-diario"
-        $argList = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Normal -Command `"iex (irm $url)`""
+        $argList = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Normal -Command `"iex (irm $url)`"" # URL del script
         
-        Start-Process powershell.exe -ArgumentList $argList -Verb RunAs
+        try {
+            Start-Process powershell.exe -ArgumentList $argList -Verb RunAs -ErrorAction Stop
+        } catch {
+            [System.Windows.Forms.MessageBox]::Show("Se requieren permisos de administrador para optimizar el sistema. El proceso se ha cancelado.", "Permisos Necesarios - Antony Dapier", "OK", "Error")
+        }
         exit
+    }
+}
+
+function Create-DesktopShortcut {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$ShortcutName,
+        [Parameter(Mandatory=$true)]
+        [string]$TargetCommand,
+        [string]$IconLocation = "imageres.dll,109", # Icono de herramientas de Windows
+        [string]$Description = "Mantenimiento y Optimización Antony Dapier"
+    )
+    $desktopPath = [System.Environment]::GetFolderPath('Desktop')
+    $shortcutPath = Join-Path $desktopPath "$ShortcutName.lnk"
+
+    try {
+        $WshShell = New-Object -ComObject WScript.Shell
+        $Shortcut = $WshShell.CreateShortcut($shortcutPath)
+        $Shortcut.TargetPath = "powershell.exe"
+        $Shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command `"$TargetCommand`""
+        $Shortcut.IconLocation = $IconLocation
+        $Shortcut.Description = $Description
+        $Shortcut.Save()
+        [System.Windows.Forms.MessageBox]::Show("¡Acceso directo creado en el escritorio!`nAhora puedes usarlo para iniciar la herramienta.", "Acceso Directo Creado - Antony Dapier", "OK", "Information")
+    } catch {
+        [System.Windows.Forms.MessageBox]::Show("Error al crear el acceso directo: $($_.Exception.Message)", "Error - Antony Dapier", "OK", "Error")
     }
 }
 
@@ -391,6 +442,23 @@ function Block-TelemetryHosts {
 
 Confirm-IsAdmin
 
+# --- LÓGICA DE CREACIÓN DE ACCESO DIRECTO (OPCIONAL) ---
+$shortcutName = "Mantenimiento Antony Dapier"
+$desktopPath = [System.Environment]::GetFolderPath('Desktop')
+$shortcutPath = Join-Path $desktopPath "$shortcutName.lnk"
+
+if (-not (Test-Path $shortcutPath)) {
+    $dialogResult = [System.Windows.Forms.MessageBox]::Show(
+        "No se encontró el acceso directo de la herramienta en tu escritorio.`n¿Deseas crearlo ahora?",
+        "Crear Acceso Directo - Antony Dapier",
+        "YesNo",
+        "Question"
+    )
+    if ($dialogResult -eq "Yes") {
+        Create-DesktopShortcut -ShortcutName $shortcutName -TargetCommand "iex (irm https://bit.ly/pc-mantenimiento-diario)"
+    }
+}
+
 # --- LÓGICA DE EJECUCIÓN ---
 $RunProcess = {
     param($Seleccion)
@@ -430,13 +498,14 @@ $RunProcess = {
     Update-UI -Message "¡PROCESO FINALIZADO!" -Progress 100
     Stop-Transcript
     
-    [System.Windows.MessageBox]::Show("Optimización completada con éxito. El equipo se reiniciará ahora.", "Finalizado", "OK", "Information")
+    [System.Windows.Forms.MessageBox]::Show("Optimización completada con éxito. El equipo se reiniciará ahora.", "Finalizado", "OK", "Information")
     if (-not $NoReiniciar) { Restart-Computer -Force }
 }
 
 # Eventos de botones
 $BtnRapido.Add_Click({ & $RunProcess -Seleccion "Rapido" })
 $BtnCompleto.Add_Click({ & $RunProcess -Seleccion "Completo" })
+$BtnShortcut.Add_Click({ Create-DesktopShortcut -ShortcutName "Mantenimiento Antony Dapier" -TargetCommand "iex (irm https://bit.ly/pc-mantenimiento-diario)" })
 
 # Mostrar ventana
 $Window.ShowDialog() | Out-Null
