@@ -18,7 +18,7 @@ param (
     [string]$Modo
 )
 
-# Cargar librerías de interfaz gráfica
+# --- CARGA DE LIBRERÍAS Y GUI (DEBE IR DESPUÉS DE PARAM) ---
 Add-Type -AssemblyName PresentationFramework
 Add-Type -AssemblyName PresentationCore
 Add-Type -AssemblyName System.Windows.Forms
