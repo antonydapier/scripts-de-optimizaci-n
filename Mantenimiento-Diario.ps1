@@ -28,9 +28,10 @@ if ([System.Threading.Thread]::CurrentThread.GetApartmentState() -ne 'STA') {
 
 # --- CARGA DE LIBRERÍAS Y GUI (DEBE IR DESPUÉS DE PARAM) ---
 try {
-    # Cargamos el conjunto completo de librerías para máxima compatibilidad
-    $assemblies = @("WindowsBase", "PresentationCore", "PresentationFramework", "System.Xaml", "System.Xml", "System.Windows.Forms")
-    foreach ($as in $assemblies) { [void][System.Reflection.Assembly]::LoadWithPartialName($as) }
+    # Add-Type es el método más seguro para registrar tipos en el motor de XAML de PowerShell 5.1
+    Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase, System.Xaml, System.Xml, System.Windows.Forms -ErrorAction Stop
+    # Forzamos una referencia al tipo Window para asegurar que el motor de XAML lo reconozca
+    [void][System.Windows.Window]
 } catch { Write-Host "Error cargando ensamblados de sistema."; exit }
 
 # --- INICIO DE LA CONFIGURACIÓN DEL INFORME ---
@@ -98,16 +99,9 @@ $xaml = @"
 "@
 
 try {
-    # Eliminación agresiva de caracteres invisibles o BOM al inicio del XAML
+    # Limpieza total para asegurar que el string comience exactamente en <Window
     $cleanXaml = $xaml -replace '^[^<]+', ''
-    
-    # Uso de XmlReader con configuraciones de compatibilidad
-    $sReader = New-Object System.IO.StringReader($cleanXaml)
-    $xSettings = New-Object System.Xml.XmlReaderSettings
-    $xReader = [System.Xml.XmlReader]::Create($sReader, $xSettings)
-    
-    # Carga del objeto Window
-    $Window = [Windows.Markup.XamlReader]::Load($xReader)
+    $Window = [Windows.Markup.XamlReader]::Parse($cleanXaml)
 
     $BtnRapido = $Window.FindName("BtnRapido")
     $BtnCompleto = $Window.FindName("BtnCompleto")
