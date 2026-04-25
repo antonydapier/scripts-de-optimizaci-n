@@ -101,46 +101,6 @@ function Confirm-IsAdmin {
     }
 }
 
-function Create-DesktopShortcut {
-    param(
-        [Parameter(Mandatory=$true)]
-        [string]$ShortcutName,
-        [Parameter(Mandatory=$true)]
-        [string]$TargetCommand,
-        [string]$IconLocation = "imageres.dll,109", # Icono de herramientas de Windows
-        [string]$Description = "Mantenimiento y Optimización Antony Dapier"
-    )
-    
-    $desktopPath = [System.Environment]::GetFolderPath('Desktop')
-    $vbsFileName = "$ShortcutName.vbs"
-    $vbsPath = Join-Path $desktopPath $vbsFileName
-    $shortcutPath = Join-Path $desktopPath "$ShortcutName.lnk"
-
-    try {
-        # 1. Crear el script VBScript auxiliar que lanzará PowerShell con permisos de administrador.
-        #    Esto asegura que el UAC se muestre y PowerShell se inicie elevado.
-        $psCommand = "-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Normal -Command `"$TargetCommand`""
-        $vbsContent = @"
-Set objShell = CreateObject("Shell.Application")
-objShell.ShellExecute "powershell.exe", "$psCommand", "", "runas", 1
-"@
-        # Guardar el VBScript en el escritorio
-        $vbsContent | Out-File -FilePath $vbsPath -Encoding ASCII -Force
-
-        # 2. Crear el acceso directo (.lnk) que apunta al VBScript
-        $WshShell = New-Object -ComObject WScript.Shell
-        $Shortcut = $WshShell.CreateShortcut($shortcutPath)
-        $Shortcut.TargetPath = $vbsPath # El acceso directo apunta al VBScript
-        $Shortcut.IconLocation = $IconLocation
-        $Shortcut.Description = $Description
-        $Shortcut.Save()
-
-        [System.Windows.Forms.MessageBox]::Show("¡Acceso directo creado en el escritorio!`nAhora puedes usarlo para iniciar la herramienta. Se solicitarán permisos de administrador al ejecutarlo.", "Acceso Directo Creado - Antony Dapier", "OK", "Information")
-    } catch {
-        [System.Windows.Forms.MessageBox]::Show("Error al crear el acceso directo: $($_.Exception.Message)", "Error - Antony Dapier", "OK", "Error")
-    }
-}
-
 function Clear-TemporaryFiles {
     $paths = @("$env:LOCALAPPDATA\Temp", "C:\Windows\Temp", "$env:TEMP") | Select-Object -Unique
     foreach ($path in $paths) {
@@ -443,8 +403,7 @@ $RunProcess = {
 # --- MENÚ DE CONSOLA ---
 Write-Host "1. Mantenimiento Rápido (Temporales, DNS, Papelera)"
 Write-Host "2. Optimización Completa (Red, Energía, Bloatware, Servicios)"
-Write-Host "3. Instalar Acceso Directo en el Escritorio"
-Write-Host "4. Salir"
+Write-Host "3. Salir"
 Write-Host ""
 $opcion = Read-Host "Seleccione una opción"
 
@@ -456,12 +415,6 @@ switch ($opcion) {
         & $RunProcess -Seleccion "Completo" 
     }
     "3" { 
-        Create-DesktopShortcut -ShortcutName "Mantenimiento Antony Dapier" -TargetCommand "iex (irm https://bit.ly/pc-mantenimiento-diario)" 
-        Write-Host "Presione cualquier tecla para volver al menú..."
-        $null = [Console]::ReadKey()
-        & "$PSCommandPath" # Reinicia el script para mostrar el menú
-    }
-    "4" { 
         Write-Host "Saliendo..." -ForegroundColor Yellow
         Stop-Transcript
         exit 
@@ -472,4 +425,3 @@ switch ($opcion) {
         & "$PSCommandPath"
     }
 }
-$Window.ShowDialog() | Out-Null
