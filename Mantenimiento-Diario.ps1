@@ -151,7 +151,13 @@ function Set-GoogleDns {
     foreach ($adapter in $networkAdapters) {
         Write-Host "`n     -> Configurando DNS para $($adapter.Name)..." -ForegroundColor Gray
         $ipconfig = Get-NetIPConfiguration -InterfaceIndex $adapter.InterfaceIndex
-        $currentDns = $ipconfig.DNSServer.IPAddress
+        
+        # Validación de seguridad para obtener DNS actuales
+        $currentDns = $null
+        if ($ipconfig.DNSServer) {
+            $currentDns = $ipconfig.DNSServer.IPAddress
+        }
+
         if ($ipconfig.IPv4Address.IPAddress -and ($null -eq $currentDns -or -not ([System.Linq.Enumerable]::SequenceEqual($currentDns, $googleDns)))) {
             try {
                 Set-DnsClientServerAddress -InterfaceIndex $adapter.InterfaceIndex -ServerAddresses $googleDns -ErrorAction Stop
@@ -237,6 +243,55 @@ function Disable-UWPBackgroundApps {
     $regPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications"
     Set-ItemProperty -Path $regPath -Name "GlobalUserDisabled" -Value 1 -Type DWord -Force
 }
+
+function Clear-ShaderCache {
+    # Limpia la caché de sombreadores de DirectX y NVIDIA/AMD que causa tirones en diseño/juegos
+    $shaderPaths = @("$env:LOCALAPPDATA\D3DSCache", "$env:LOCALAPPDATA\NVIDIA\DXCache", "$env:LOCALAPPDATA\AMD\DxCache")
+    foreach ($path in $shaderPaths) {
+        if (Test-Path $path) { Get-ChildItem -Path $path -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue }
+    }
+}
+
+function Optimize-GPUScheduling {
+    # Solo aplica si se detecta una GPU dedicada (NVIDIA o AMD)
+    $gpus = Get-CimInstance Win32_VideoController
+    if ($gpus.Name -match "NVIDIA" -or $gpus.Name -match "AMD") {
+        Write-Host "     GPU compatible detectada. Habilitando HAGS..." -ForegroundColor Gray
+        $regPath = "HKLM:\SYSTEM\CurrentControlSet\Control\GraphicsDrivers"
+        Set-ItemProperty -Path $regPath -Name "HwSchMode" -Value 2 -Type DWord -Force
+    } else {
+        Write-Host "     GPU dedicada no detectada. Omitiendo HAGS." -ForegroundColor Gray
+    }
+}
+
+function Optimize-Windows11UI {
+    # Restaura el menú contextual clásico en Windows 11 para eliminar el lag del explorador
+    if ((Get-CimInstance Win32_OperatingSystem).Caption -like "*Windows 11*") {
+        $basePath = "HKCU:\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}"
+        $inprocPath = "$basePath\InprocServer32"
+        try {
+            if (-not (Test-Path $inprocPath)) { New-Item -Path $inprocPath -Recursive -Force | Out-Null }
+            Set-ItemProperty -Path $inprocPath -Name "(Default)" -Value "" -Force
+            Write-Host "     Menú contextual clásico activado para Windows 11." -ForegroundColor Gray
+        } catch { Write-Warning "No se pudo modificar el menú contextual." }
+    }
+}
+
+function Disable-MemoryIntegrity {
+    # Solo aplica en equipos con hardware suficiente para que el cambio valga la pena (8GB+ RAM y 4+ Cores)
+    $ram = (Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB
+    $cores = (Get-CimInstance Win32_Processor).NumberOfLogicalProcessors
+
+    if ($ram -ge 8 -and $cores -ge 4) {
+        Write-Host "     Hardware apto detectado. Desactivando VBS para liberar CPU..." -ForegroundColor Gray
+        $regPath = "HKLM:\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity"
+        if (-not (Test-Path $regPath)) { New-Item -Path $regPath -Recursive -Force | Out-Null }
+        Set-ItemProperty -Path $regPath -Name "Enabled" -Value 0 -Type DWord -Force
+    } else {
+        Write-Host "     Equipo modesto detectado. Se mantiene VBS por seguridad." -ForegroundColor Gray
+    }
+}
+
 function Optimize-BackgroundProcesses {
     # LISTA MÁXIMA COMPATIBILIDAD: Se han ELIMINADO WpnService, WSearch, CDPUserSvc y dmwappushsvc.
     $serviciosADeshabilitar = @(
@@ -337,6 +392,46 @@ function Optimize-MemoryManagement {
     # Optimiza el uso de la memoria para programas en lugar de caché del sistema (según el caso)
     Set-ItemProperty -Path $regPath -Name "SystemPages" -Value 0 -Type DWord -Force
 }
+
+function Optimize-NTFS {
+    # Deshabilita el registro del último acceso a archivos (reduce operaciones de escritura constantes)
+    fsutil behavior set disablelastaccess 1 | Out-Null
+}
+
+function Optimize-KernelPerformance {
+    $regPath = "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management"
+    $totalRamGB = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
+    
+    if ($totalRamGB -ge 12) {
+        # Si hay suficiente RAM (12GB+), forzamos el Kernel a RAM para máxima fluidez
+        Set-ItemProperty -Path $regPath -Name "DisablePagingExecutive" -Value 1 -Type DWord -Force
+        Write-Host "     RAM suficiente ($totalRamGB GB). Kernel optimizado en memoria física." -ForegroundColor Gray
+    } else {
+        # En sistemas con poca RAM, dejamos que Windows gestione la paginación para no quitar espacio a apps
+        Set-ItemProperty -Path $regPath -Name "DisablePagingExecutive" -Value 0 -Type DWord -Force
+        Write-Host "     RAM limitada ($totalRamGB GB). Se mantiene gestión estándar para ahorrar memoria." -ForegroundColor Gray
+    }
+}
+
+function Optimize-SystemShutdown {
+    # Reduce el tiempo de espera para cerrar servicios al apagar (de 20s a 2s)
+    $regPath = "HKLM:\SYSTEM\CurrentControlSet\Control"
+    Set-ItemProperty -Path $regPath -Name "WaitToKillServiceTimeout" -Value "2000" -Force
+}
+
+function Repair-SystemIntegrity {
+    # Limpia archivos obsoletos de actualizaciones de Windows (WinSxS)
+    # Es seguro y recupera mucho espacio en disco.
+    Write-Host "     Limpiando almacén de componentes (puede tardar unos minutos)..." -ForegroundColor Gray
+    dism.exe /online /Cleanup-Image /StartComponentCleanup /Quiet
+}
+
+function Optimize-StorageDrives {
+    # El parámetro /O selecciona el modo apropiado: TRIM para SSD y Defrag para HDD.
+    Write-Host "     Iniciando optimización nativa de la unidad C:..." -ForegroundColor Gray
+    defrag.exe C: /O /Quiet
+}
+
 function Block-TelemetryHosts {
     $hostsPath = "$env:SystemRoot\System32\drivers\etc\hosts"
     $telemetryDomains = @(
@@ -410,6 +505,7 @@ $RunProcess = {
     $maintenanceTasks = @(
         @{ Name = "Limpieza Temporales"; Action = { Clear-TemporaryFiles } },
         @{ Name = "Vaciado de Papelera"; Action = { Clear-RecycleBinAllDrives } },
+        @{ Name = "Limpieza de Caché de Shaders (GPU)"; Action = { Clear-ShaderCache } },
         @{ Name = "Flush DNS"; Action = { Flush-DnsCache } }
     )
     foreach ($task in $maintenanceTasks) { Write-TaskStatus -TaskName $task.Name -Action $task.Action }
@@ -421,9 +517,15 @@ $RunProcess = {
     @{ Name = "Configuración DNS de Google"; Action = { Set-GoogleDns } },
     @{ Name = "Optimización de Conexiones de Red"; Action = { Set-NetworkOptimization } },
     @{ Name = "Ajuste de Plan de Energía a Equilibrado/Rendimiento"; Action = { Optimize-PowerPlan } },
+    @{ Name = "Optimización de Escritura NTFS"; Action = { Optimize-NTFS } },
+    @{ Name = "Aceleración por Hardware GPU (HAGS)"; Action = { Optimize-GPUScheduling } },
+    @{ Name = "Optimización de Kernel (RAM)"; Action = { Optimize-KernelPerformance } },
+    @{ Name = "Desactivación de Seguridad VBS (Boost CPU)"; Action = { Disable-MemoryIntegrity } },
+    @{ Name = "Aceleración de Apagado del Sistema"; Action = { Optimize-SystemShutdown } },
     @{ Name = "Optimización de Gestión de Memoria RAM"; Action = { Optimize-MemoryManagement } },
     @{ Name = "Desactivación de Hibernación/Inicio Rápido"; Action = { Disable-Hibernation } },
     @{ Name = "Priorización de Aplicaciones en Primer Plano"; Action = { Prioritize-ForegroundApps } },
+    @{ Name = "Restaurar Menú Contextual Clásico (Win11)"; Action = { Optimize-Windows11UI } },
     @{ Name = "Desactivación de Características de Gaming (Game Bar)"; Action = { Disable-GamingFeatures } },
     @{ Name = "Desactivación de OneDrive en el Explorador"; Action = { Disable-OneDriveIntegration } },
     @{ Name = "Desactivación de Optimización de Entrega y Store Updates"; Action = { Disable-DeliveryOptimization } },
@@ -433,6 +535,8 @@ $RunProcess = {
     @{ Name = "Desactivación de Nombres 8.3"; Action = { Disable-8dot3Names } },
     @{ Name = "Optimización de Procesos en Segundo Plano (Segura)"; Action = { Optimize-BackgroundProcesses } },
     @{ Name = "Optimización específica para SSD (SysMain/Prefetch)"; Action = { Optimize-StorageSettings } },
+    @{ Name = "Optimización Nativa de Disco (Trim/Defrag)"; Action = { Optimize-StorageDrives } },
+    @{ Name = "Limpieza de Componentes Obsoletos (DISM)"; Action = { Repair-SystemIntegrity } },
     @{ Name = "Bloqueo de Dominios de Telemetría (Hosts)"; Action = { Block-TelemetryHosts } }
         )
         foreach ($task in $optimizationTasks) { Write-TaskStatus -TaskName $task.Name -Action $task.Action }
