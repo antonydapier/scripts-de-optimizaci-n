@@ -1,7 +1,8 @@
 # ================================================================
 # Script de Mantenimiento y Optimización de Windows 10 y Windows 11
-# Autor: Antony Dapier (Versión 10.3 - Máxima Compatibilidad y Menú)
-# Descripción: Renidmiento para Windows 11.
+# Autor: Antony Dapier (Versión 10.2 - Máxima Compatibilidad y Menú)
+# Descripción: Versión segura que preserva los servicios críticos para
+#              Notificaciones (WhatsApp), Herramienta de Recortes y Apps Modernas.
 # ================================================================
 
 # Requiere PowerShell 5.1 
@@ -173,6 +174,8 @@ function Disable-VisualEffects {
     Set-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name "FontSmoothing" -Value "2" -Type String -Force
     Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "IconsOnly" -Value 0 -Type DWord -Force
     Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "EnableTransparency" -Value 0 -Force
+    Set-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name "UserPreferencesMask" -Value ([byte[]](0x90,0x12,0x03,0x80,0x10,0x00,0x00,0x00)) -Force
+    Set-ItemProperty -Path "HKCU:\Control Panel\Desktop\WindowMetrics" -Name "MinAnimate" -Value 0 -Force
 }
 function Remove-Bloatware {
     Write-Host "`n  -> Creando punto de restauración..." -NoNewline
@@ -230,6 +233,10 @@ function Set-BandwidthLimit {
     Set-ItemProperty -Path $regPath -Name "NonBestEffortLimit" -Value 0 -Type DWord -Force
 }
 
+function Disable-UWPBackgroundApps {
+    $regPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications"
+    Set-ItemProperty -Path $regPath -Name "GlobalUserDisabled" -Value 1 -Type DWord -Force
+}
 function Optimize-BackgroundProcesses {
     # LISTA MÁXIMA COMPATIBILIDAD: Se han ELIMINADO WpnService, WSearch, CDPUserSvc y dmwappushsvc.
     $serviciosADeshabilitar = @(
@@ -322,6 +329,14 @@ function Prioritize-ForegroundApps {
     Set-ItemProperty -Path $regPath -Name "Win32PrioritySeparation" -Value 2 -Type DWord -Force
 }
 function Disable-8dot3Names { fsutil.exe behavior set disable8dot3 1 | Out-Null }
+
+function Optimize-MemoryManagement {
+    $regPath = "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management"
+    # Habilita un caché de sistema más grande para mejorar el rendimiento de E/S
+    Set-ItemProperty -Path $regPath -Name "LargeSystemCache" -Value 1 -Type DWord -Force
+    # Optimiza el uso de la memoria para programas en lugar de caché del sistema (según el caso)
+    Set-ItemProperty -Path $regPath -Name "SystemPages" -Value 0 -Type DWord -Force
+}
 function Block-TelemetryHosts {
     $hostsPath = "$env:SystemRoot\System32\drivers\etc\hosts"
     $telemetryDomains = @(
@@ -366,6 +381,8 @@ function Optimize-StorageSettings {
         if (Test-Path $sysMainPath) {
             Set-ItemProperty -Path $sysMainPath -Name "Start" -Value 4 -Force
         }
+        # Asegurar que TRIM esté activo
+        fsutil behavior set DisableDeleteNotify 0 | Out-Null
         # Prefetch - EnablePrefetcher 0 = Disabled
         $prefetchPath = "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management\PrefetchParameters"
         if (-not (Test-Path $prefetchPath)) { New-Item -Path $prefetchPath -Force | Out-Null }
@@ -383,6 +400,7 @@ Confirm-IsAdmin
 Clear-Host
 Write-Host "====================================================" -ForegroundColor Cyan
 Write-Host "    MANTENIMIENTO DE SISTEMA - ANTONY DAPIER" -ForegroundColor White
+Write-Host "    Hardware: $(if (Is-SystemDriveSSD) { "SSD Detectado (Optimización disponible)" } else { "HDD/Otro Detectado (SysMain/Prefetch se mantendrán)" })" -ForegroundColor Gray
 Write-Host "====================================================" -ForegroundColor Cyan
 
 # --- LÓGICA DE EJECUCIÓN ---
@@ -403,11 +421,14 @@ $RunProcess = {
     @{ Name = "Configuración DNS de Google"; Action = { Set-GoogleDns } },
     @{ Name = "Optimización de Conexiones de Red"; Action = { Set-NetworkOptimization } },
     @{ Name = "Ajuste de Plan de Energía a Equilibrado/Rendimiento"; Action = { Optimize-PowerPlan } },
+    @{ Name = "Optimización de Gestión de Memoria RAM"; Action = { Optimize-MemoryManagement } },
     @{ Name = "Desactivación de Hibernación/Inicio Rápido"; Action = { Disable-Hibernation } },
     @{ Name = "Priorización de Aplicaciones en Primer Plano"; Action = { Prioritize-ForegroundApps } },
     @{ Name = "Desactivación de Características de Gaming (Game Bar)"; Action = { Disable-GamingFeatures } },
     @{ Name = "Desactivación de OneDrive en el Explorador"; Action = { Disable-OneDriveIntegration } },
     @{ Name = "Desactivación de Optimización de Entrega y Store Updates"; Action = { Disable-DeliveryOptimization } },
+    @{ Name = "Desactivación de Apps en Segundo Plano (UWP)"; Action = { Disable-UWPBackgroundApps } },
+    @{ Name = "Ajuste de Efectos Visuales para Rendimiento"; Action = { Disable-VisualEffects } },
     @{ Name = "Desactivación de Sugerencias y Anuncios (WebSearch)"; Action = { Disable-WebSearch } },
     @{ Name = "Desactivación de Nombres 8.3"; Action = { Disable-8dot3Names } },
     @{ Name = "Optimización de Procesos en Segundo Plano (Segura)"; Action = { Optimize-BackgroundProcesses } },
