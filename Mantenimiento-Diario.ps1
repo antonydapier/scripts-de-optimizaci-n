@@ -1,8 +1,7 @@
 # ================================================================
 # Script de Mantenimiento y Optimización de Windows 10 y Windows 11
-# Autor: Antony Dapier (Versión 10.2 - Máxima Compatibilidad y Menú)
-# Descripción: Versión segura que preserva los servicios críticos para
-#              Notificaciones (WhatsApp), Herramienta de Recortes y Apps Modernas.
+# Autor: Antony Dapier (Versión 10.3 - Máxima Compatibilidad y Menú)
+# Descripción: Renidmiento para Windows 11.
 # ================================================================
 
 # Requiere PowerShell 5.1 
@@ -49,6 +48,15 @@ function Update-UI {
 # ==============================
 # FUNCIONES DE AYUDA
 # ==============================
+
+function Is-SystemDriveSSD {
+    try {
+        $driveLetter = $env:SystemDrive.Substring(0,1)
+        $diskNum = (Get-Partition -DriveLetter $driveLetter).DiskNumber
+        $type = (Get-PhysicalDisk -DeviceNumber $diskNum).MediaType
+        return $type -eq 'SSD'
+    } catch { return $false }
+}
 
 function Log-Error {
     param ([string]$message)
@@ -350,6 +358,23 @@ function Block-TelemetryHosts {
     }
 }
 
+function Optimize-StorageSettings {
+    if (Is-SystemDriveSSD) {
+        Write-Host "     SSD detectado. Deshabilitando SysMain y Prefetch..." -ForegroundColor Gray
+        # SysMain (Superfetch) - Start 4 = Disabled
+        $sysMainPath = "HKLM:\SYSTEM\CurrentControlSet\Services\SysMain"
+        if (Test-Path $sysMainPath) {
+            Set-ItemProperty -Path $sysMainPath -Name "Start" -Value 4 -Force
+        }
+        # Prefetch - EnablePrefetcher 0 = Disabled
+        $prefetchPath = "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management\PrefetchParameters"
+        if (-not (Test-Path $prefetchPath)) { New-Item -Path $prefetchPath -Force | Out-Null }
+        Set-ItemProperty -Path $prefetchPath -Name "EnablePrefetcher" -Value 0 -Type DWord -Force
+    } else {
+        Write-Host "     HDD detectado o no determinado. Se mantiene SysMain/Prefetch para mejor rendimiento en discos mecánicos." -ForegroundColor Gray
+    }
+}
+
 # ==============================
 # EJECUCIÓN DEL SCRIPT
 # ==============================
@@ -386,6 +411,7 @@ $RunProcess = {
     @{ Name = "Desactivación de Sugerencias y Anuncios (WebSearch)"; Action = { Disable-WebSearch } },
     @{ Name = "Desactivación de Nombres 8.3"; Action = { Disable-8dot3Names } },
     @{ Name = "Optimización de Procesos en Segundo Plano (Segura)"; Action = { Optimize-BackgroundProcesses } },
+    @{ Name = "Optimización específica para SSD (SysMain/Prefetch)"; Action = { Optimize-StorageSettings } },
     @{ Name = "Bloqueo de Dominios de Telemetría (Hosts)"; Action = { Block-TelemetryHosts } }
         )
         foreach ($task in $optimizationTasks) { Write-TaskStatus -TaskName $task.Name -Action $task.Action }
