@@ -59,6 +59,25 @@ function Is-SystemDriveSSD {
     } catch { return $false }
 }
 
+function Get-StorageDrivesInfo {
+    # Retorna información sobre todos los discos, identificando el del sistema y de almacenamiento
+    try {
+        $systemDrive = $env:SystemDrive.TrimEnd(':')
+        $allDrives = Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Name.Length -eq 1 }
+        $storageDrives = $allDrives | Where-Object { $_.Name -ne $systemDrive }
+        
+        $info = @{
+            SystemDrive = $systemDrive
+            SystemDrivePath = $env:SystemDrive
+            StorageDrives = $storageDrives
+            StorageCount = ($storageDrives | Measure-Object).Count
+        }
+        return $info
+    } catch {
+        return @{ SystemDrive = "C"; StorageCount = 0; StorageDrives = @() }
+    }
+}
+
 function Log-Error {
     param ([string]$message)
     Write-Host "ERROR: $message" -ForegroundColor Red
@@ -285,7 +304,7 @@ function Disable-MemoryIntegrity {
     if ($ram -ge 8 -and $cores -ge 4) {
         Write-Host "     Hardware apto detectado. Desactivando VBS para liberar CPU..." -ForegroundColor Gray
         $regPath = "HKLM:\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity"
-        if (-not (Test-Path $regPath)) { New-Item -Path $regPath -Recursive -Force | Out-Null }
+        if (-not (Test-Path $regPath)) { New-Item -Path $regPath -Force | Out-Null }
         Set-ItemProperty -Path $regPath -Name "Enabled" -Value 0 -Type DWord -Force
     } else {
         Write-Host "     Equipo modesto detectado. Se mantiene VBS por seguridad." -ForegroundColor Gray
@@ -427,9 +446,23 @@ function Repair-SystemIntegrity {
 }
 
 function Optimize-StorageDrives {
-    # El parámetro /O selecciona el modo apropiado: TRIM para SSD y Defrag para HDD.
-    Write-Host "     Iniciando optimización nativa de la unidad C:..." -ForegroundColor Gray
-    defrag.exe C: /O /Quiet
+    # Solo optimiza el disco del sistema y protege otros discos de almacenamiento
+    try {
+        # Obtener el disco del sistema (normalmente C:)
+        $systemDrive = $env:SystemDrive
+        Write-Host "     Iniciando optimización nativa de la unidad $systemDrive (Disco del Sistema)..." -ForegroundColor Gray
+        
+        # Usar /Optimize en lugar de /O, que es el parámetro correcto en defrag.exe
+        defrag.exe $systemDrive /Optimize /Quiet 2>$null
+        
+        # Mensaje informativo sobre otros discos
+        $otherDrives = Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Name -ne $systemDrive.TrimEnd(':') -and $_.Name.Length -eq 1 }
+        if ($otherDrives) {
+            Write-Host "     Otros discos detectados: protegidos de optimización automática." -ForegroundColor Gray
+        }
+    } catch {
+        Write-Warning "No se pudo optimizar el disco. Continuando con el siguiente paso..."
+    }
 }
 
 function Block-TelemetryHosts {
@@ -469,8 +502,10 @@ function Block-TelemetryHosts {
 }
 
 function Optimize-StorageSettings {
+    $driveInfo = Get-StorageDrivesInfo
+    
     if (Is-SystemDriveSSD) {
-        Write-Host "     SSD detectado. Deshabilitando SysMain y Prefetch..." -ForegroundColor Gray
+        Write-Host "     SSD detectado en disco del sistema. Deshabilitando SysMain y Prefetch..." -ForegroundColor Gray
         # SysMain (Superfetch) - Start 4 = Disabled
         $sysMainPath = "HKLM:\SYSTEM\CurrentControlSet\Services\SysMain"
         if (Test-Path $sysMainPath) {
@@ -485,6 +520,12 @@ function Optimize-StorageSettings {
     } else {
         Write-Host "     HDD detectado o no determinado. Se mantiene SysMain/Prefetch para mejor rendimiento en discos mecánicos." -ForegroundColor Gray
     }
+    
+    # Informar sobre discos de almacenamiento
+    if ($driveInfo.StorageCount -gt 0) {
+        $storageList = $driveInfo.StorageDrives -join ", "
+        Write-Host "     Discos de almacenamiento detectados ($storageList): No serán optimizados automáticamente." -ForegroundColor Cyan
+    }
 }
 
 # ==============================
@@ -495,7 +536,16 @@ Confirm-IsAdmin
 Clear-Host
 Write-Host "====================================================" -ForegroundColor Cyan
 Write-Host "    MANTENIMIENTO DE SISTEMA - ANTONY DAPIER" -ForegroundColor White
-Write-Host "    Hardware: $(if (Is-SystemDriveSSD) { "SSD Detectado (Optimización disponible)" } else { "HDD/Otro Detectado (SysMain/Prefetch se mantendrán)" })" -ForegroundColor Gray
+
+# Mostrar información de discos
+$driveInfo = Get-StorageDrivesInfo
+$ssdStatus = if (Is-SystemDriveSSD) { "SSD Detectado (Optimización disponible)" } else { "HDD/Otro Detectado (SysMain/Prefetch se mantendrán)" }
+Write-Host "    Hardware: $ssdStatus" -ForegroundColor Gray
+
+if ($driveInfo.StorageCount -gt 0) {
+    Write-Host "    Discos de Almacenamiento: $($driveInfo.StorageDrives -join ', ') (PROTEGIDOS)" -ForegroundColor Yellow
+}
+
 Write-Host "====================================================" -ForegroundColor Cyan
 
 # --- LÓGICA DE EJECUCIÓN ---
